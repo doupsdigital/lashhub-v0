@@ -10,7 +10,8 @@ import {
   List, 
   ChevronLeft, 
   ChevronRight,
-  LogOut
+  LogOut,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -53,7 +54,8 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobile
   ];
 
   const systemItems = [
-    { name: 'Usuários', path: '/usuarios', icon: Settings },
+    { name: 'Configurações', path: '/configuracoes', icon: Settings },
+    { name: 'Usuários', path: '/usuarios', icon: Shield },
     { name: 'Logs', path: '/logs', icon: List },
   ];
 
@@ -156,9 +158,17 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobile
         <div className="p-3 border-t border-border bg-rose-50/30 flex flex-col gap-2">
           <div className={`flex items-center gap-2.5 ${collapsed ? 'justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-rose-200 text-rose-800 flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                {initials}
-              </div>
+              {profile?.avatar_url ? (
+                <img 
+                  src={profile.avatar_url} 
+                  alt={userName} 
+                  className="w-9 h-9 rounded-full object-cover border border-rose-200 flex-shrink-0" 
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-rose-200 text-rose-800 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                  {initials}
+                </div>
+              )}
               {!collapsed && (
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-text-primary truncate">{userName}</p>

@@ -11,6 +11,7 @@ import Profissionais from './pages/Profissionais';
 import Agendamentos from './pages/Agendamentos';
 import Usuarios from './pages/Usuarios';
 import Logs from './pages/Logs';
+import Configuracoes from './pages/Configuracoes';
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="agendamentos" element={<Agendamentos />} />
             <Route path="usuarios" element={<Usuarios />} />
             <Route path="logs" element={<Logs />} />
+            <Route path="configuracoes" element={<Configuracoes />} />
           </Route>
           
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -11,6 +11,7 @@ interface AuthContextType {
   profile: Usuario | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,6 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Erro de rede ao carregar perfil do usuário:', err);
       return null;
+    }
+  };
+
+  const refreshProfile = async () => {
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (currentSession?.user?.email) {
+      const userProfile = await fetchProfile(currentSession.user.email);
+      setProfile(userProfile);
+      if (userProfile?.nome) {
+        setCurrentUsuarioNome(userProfile.nome);
+      }
     }
   };
 
@@ -100,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
