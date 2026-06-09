@@ -13,6 +13,7 @@ import Agendamentos from './pages/Agendamentos';
 import Configuracoes from './pages/Configuracoes';
 import MeusHorarios from './pages/MeusHorarios';
 import CadastroCliente from './pages/portal/CadastroCliente';
+import PortalCatalogo from './pages/portal/PortalCatalogo';
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -61,7 +62,7 @@ export default function App() {
             }
           >
             <Route index element={<Navigate to="catalogo" replace />} />
-            <Route path="catalogo" element={<Placeholder title="Catálogo de Serviços" />} />
+            <Route path="catalogo" element={<PortalCatalogo />} />
             <Route path="agendar" element={<Placeholder title="Agendar Serviço" />} />
             <Route path="meus-agendamentos" element={<Placeholder title="Meus Agendamentos" />} />
             <Route path="perfil" element={<Placeholder title="Meu Perfil" />} />
