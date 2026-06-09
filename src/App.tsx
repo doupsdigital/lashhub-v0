@@ -10,6 +10,7 @@ import PerfilCliente from './pages/PerfilCliente';
 import Servicos from './pages/Servicos';
 import Agendamentos from './pages/Agendamentos';
 import Configuracoes from './pages/Configuracoes';
+import MeusHorarios from './pages/MeusHorarios';
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -52,7 +53,7 @@ export default function App() {
             <Route path="clientes/:id" element={<PerfilCliente />} />
             <Route path="servicos" element={<Servicos />} />
             <Route path="agendamentos" element={<Agendamentos />} />
-            <Route path="meus-horarios" element={<Placeholder title="Meus Horários" />} />
+            <Route path="meus-horarios" element={<MeusHorarios />} />
             <Route path="configuracoes" element={<Configuracoes />} />
           </Route>
 
