@@ -1,16 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid,
   Users,
   Tag,
   Calendar,
+  Clock,
   Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -22,6 +24,21 @@ interface SidebarProps {
 export default function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: SidebarProps) {
   const navigate = useNavigate();
   const { profile, user, signOut } = useAuth();
+  const [businessName, setBusinessName] = useState<string>('...');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from('configuracao_negocio')
+      .select('nome_negocio, logo_url')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setBusinessName(data.nome_negocio || 'Studio');
+          setLogoUrl(data.logo_url || null);
+        }
+      });
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -47,6 +64,7 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobile
     { name: 'Clientes', path: '/clientes', icon: Users },
     { name: 'Serviços', path: '/servicos', icon: Tag },
     { name: 'Agendamentos', path: '/agendamentos', icon: Calendar },
+    { name: 'Meus Horários', path: '/meus-horarios', icon: Clock },
   ];
 
   const systemItems = [
@@ -101,12 +119,20 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobile
         <div>
           <div className={`h-[60px] border-b border-border flex items-center px-4 ${collapsed ? 'justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-title font-semibold text-lg flex-shrink-0">
-                R
-              </div>
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={businessName}
+                  className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-title font-semibold text-lg flex-shrink-0">
+                  {businessName !== '...' ? businessName[0].toUpperCase() : 'S'}
+                </div>
+              )}
               {!collapsed && (
                 <span className="font-title font-semibold text-xl text-text-primary tracking-wide whitespace-nowrap">
-                  Rosaê Clinic
+                  {businessName}
                 </span>
               )}
             </div>

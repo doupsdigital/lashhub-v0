@@ -17,7 +17,6 @@ import {
 import type { CategoriaServico, Servico, VariacaoServico } from '../types';
 import { registrarLog } from '../utils/log';
 import ConfirmModal from '../components/common/ConfirmModal';
-import { useAuth } from '../contexts/AuthContext';
 
 // Extend types to include relations
 interface VariacaoInput {
@@ -37,7 +36,6 @@ interface CategoriaWithRelations extends CategoriaServico {
 }
 
 export default function Servicos() {
-  const { isAdmin } = useAuth();
   const [categorias, setCategorias] = useState<CategoriaWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,27 +171,6 @@ export default function Servicos() {
     }
   };
 
-  const handleToggleCategoriaStatus = async (cat: CategoriaServico) => {
-    const newStatus = !cat.ativo;
-    try {
-      const { error } = await supabase
-        .from('categorias_servico')
-        .update({ ativo: newStatus })
-        .eq('id', cat.id);
-
-      if (error) throw error;
-      await registrarLog(
-        'editou', 
-        'categoria', 
-        cat.id, 
-        `${newStatus ? 'Ativou' : 'Desativou'} categoria de serviço "${cat.nome}"`
-      );
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      showTemporaryError('Falha ao atualizar status da categoria.');
-    }
-  };
 
   const handleDeleteCategoria = async (cat: CategoriaWithRelations) => {
     // Regra: não pode excluir categoria com serviços vinculados
@@ -242,9 +219,7 @@ export default function Servicos() {
     } else {
       setEditingServico(null);
       setServicoNome('');
-      // Seleciona a primeira categoria ativa como padrão
-      const activeCats = categorias.filter(c => c.ativo);
-      setServicoCategoriaId(activeCats.length > 0 ? activeCats[0].id : '');
+      setServicoCategoriaId(categorias.length > 0 ? categorias[0].id : '');
       setServicoDuracao(30);
       setServicoValor(100.0);
       setServicoVariacoes([]);
@@ -284,7 +259,7 @@ export default function Servicos() {
             nome: servicoNome,
             categoria_id: servicoCategoriaId,
             duracao_minutos: servicoDuracao,
-            valor_padrao: servicoValor
+            valor: servicoValor
           })
           .eq('id', editingServico.id);
 
@@ -299,7 +274,7 @@ export default function Servicos() {
             nome: servicoNome,
             categoria_id: servicoCategoriaId,
             duracao_minutos: servicoDuracao,
-            valor_padrao: servicoValor
+            valor: servicoValor
           })
           .select()
           .single();
@@ -418,43 +393,33 @@ export default function Servicos() {
   };
 
   // FILTER LOGIC
+  // categorias_servico has no ativo column — status filter applies only to services
   const filteredCategorias = categorias.map(cat => {
-    // Filtro por categoria (se ela for inativa e o status for 'ativos', removemos)
-    if (statusFilter === 'ativos' && !cat.ativo) return null;
-    if (statusFilter === 'inativos' && cat.ativo) return null;
-
-    // Filtra os serviços
     const filteredServicos = cat.servicos.filter(serv => {
-      // Filtro de texto
       const matchesSearch = serv.nome.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Filtro de status
-      const matchesStatus = 
+      const matchesStatus =
         statusFilter === 'todos' ||
         (statusFilter === 'ativos' && serv.ativo) ||
         (statusFilter === 'inativos' && !serv.ativo);
-
       return matchesSearch && matchesStatus;
     });
 
-    // Se o termo de busca não for vazio, mas a categoria não contiver nenhum serviço correspondente, não a mostramos
     if (searchTerm.trim() !== '' && filteredServicos.length === 0) return null;
 
-    return {
-      ...cat,
-      servicos: filteredServicos
-    };
+    return { ...cat, servicos: filteredServicos };
   }).filter((cat): cat is CategoriaWithRelations => cat !== null);
 
-  const activeCategoriesCount = categorias.filter(c => c.ativo).length;
+  const activeCategoriesCount = categorias.length;
 
   return (
     <div className="space-y-6">
-      {/* Top Banner Alert for Errors */}
+      {/* Floating Toast for Errors */}
       {errorMessage && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
-          <p className="text-sm font-medium">{errorMessage}</p>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-lg px-4 pointer-events-none">
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-3 shadow-lg animate-fade-in pointer-events-auto">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
+            <p className="text-sm font-medium">{errorMessage}</p>
+          </div>
         </div>
       )}
 
@@ -521,9 +486,9 @@ export default function Servicos() {
         /* Categorias Grouped List */
         <div className="space-y-8">
           {filteredCategorias.map(cat => (
-            <div 
-              key={cat.id} 
-              className={`bg-white border border-border rounded-[14px] overflow-hidden shadow-sm transition-opacity duration-300 ${!cat.ativo ? 'opacity-60 bg-gray-50/50' : ''}`}
+            <div
+              key={cat.id}
+              className="bg-white border border-border rounded-[14px] overflow-hidden shadow-sm"
             >
               {/* Category Header */}
               <div className="bg-rose-50/20 border-b border-border px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -534,11 +499,6 @@ export default function Servicos() {
                       {cat.servicos.length} {cat.servicos.length === 1 ? 'serviço' : 'serviços'}
                     </span>
                   </h3>
-                  {!cat.ativo && (
-                    <span className="text-[10px] font-sans font-semibold px-2 py-0.5 rounded bg-gray-200 text-gray-700 uppercase tracking-wider">
-                      Inativa
-                    </span>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-2.5">
@@ -550,31 +510,22 @@ export default function Servicos() {
                     <Edit2 className="w-4 h-4" />
                   </button>
                   
-                  <button
-                    onClick={() => handleToggleCategoriaStatus(cat)}
-                    className={`p-1.5 rounded transition-colors cursor-pointer ${cat.ativo ? 'text-green-600 hover:bg-green-50' : 'text-text-muted hover:bg-gray-100'}`}
-                    title={cat.ativo ? 'Desativar Categoria' : 'Ativar Categoria'}
-                  >
-                    <Power className="w-4 h-4" />
-                  </button>
 
-                  {isAdmin && (
-                    <div className="relative group">
-                      <button
-                        onClick={() => handleDeleteCategoria(cat)}
-                        disabled={cat.servicos.length > 0}
-                        className={`p-1.5 rounded transition-colors cursor-pointer ${cat.servicos.length > 0 ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
-                        title={cat.servicos.length > 0 ? '' : 'Excluir Categoria'}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      {cat.servicos.length > 0 && (
-                        <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-text-primary text-white text-[11px] rounded shadow-lg z-10 font-sans leading-relaxed">
-                          Não é permitido excluir uma categoria com serviços vinculados. Desative-a em vez disso.
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="relative group">
+                    <button
+                      onClick={() => handleDeleteCategoria(cat)}
+                      disabled={cat.servicos.length > 0}
+                      className={`p-1.5 rounded transition-colors cursor-pointer ${cat.servicos.length > 0 ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
+                      title={cat.servicos.length > 0 ? '' : 'Excluir Categoria'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    {cat.servicos.length > 0 && (
+                      <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-text-primary text-white text-[11px] rounded shadow-lg z-10 font-sans leading-relaxed">
+                        Não é permitido excluir uma categoria com serviços vinculados. Desative-a em vez disso.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -649,15 +600,13 @@ export default function Servicos() {
                           <Power className="w-4 h-4" />
                         </button>
 
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleDeleteServico(serv)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                            title="Excluir Serviço"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDeleteServico(serv)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                          title="Excluir Serviço"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -763,10 +712,8 @@ export default function Servicos() {
                   className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-pointer"
                 >
                   <option value="" disabled>Selecione uma categoria ativa</option>
-                  {categorias.filter(c => c.ativo || c.id === servicoCategoriaId).map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nome} {!cat.ativo && '(Inativa)'}
-                    </option>
+                  {categorias.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.nome}</option>
                   ))}
                 </select>
               </div>

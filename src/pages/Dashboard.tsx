@@ -105,13 +105,16 @@ export default function Dashboard() {
   const [totalClients, setTotalClients] = useState(0);
   const [totalAppointments, setTotalAppointments] = useState(0);
   const [totalEarned, setTotalEarned] = useState(0);
+  const [pendingAppointments, setPendingAppointments] = useState(0);
+
+  // Today's schedule
+  const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
 
   // Chart states
   const [revenueTimeData, setRevenueTimeData] = useState<any[]>([]);
   const [appointmentsWeekdayData, setAppointmentsWeekdayData] = useState<any[]>([]);
   const [clientsNewRecurrentData, setClientsNewRecurrentData] = useState<any[]>([]);
   const [topServicesData, setTopServicesData] = useState<any[]>([]);
-  const [appointmentsProfData, setAppointmentsProfData] = useState<any[]>([]);
   const [revenueCategoryData, setRevenueCategoryData] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -146,7 +149,7 @@ export default function Dashboard() {
       });
 
       // 2. Fetch main tables data for the active period
-      const [clientsRes, apptsRes, atendsRes] = await Promise.all([
+      const [clientsRes, apptsRes, atendsRes, pendingRes, todayRes] = await Promise.all([
         // Clients registered in the period
         supabase
           .from('clientes')
@@ -156,7 +159,7 @@ export default function Dashboard() {
         // Appointments in the period
         supabase
           .from('agendamentos')
-          .select('id, data_hora, status, profissional_id, profissional:profissionais(nome, sobrenome)')
+          .select('id, data_hora, status')
           .gte('data_hora', startIso)
           .lte('data_hora', endIso),
         // Atendimentos in the period
@@ -164,7 +167,24 @@ export default function Dashboard() {
           .from('atendimentos')
           .select('id, cliente_id, data_atendimento, valor_cobrado, servico_id')
           .gte('data_atendimento', startDateStr)
-          .lte('data_atendimento', endDateStr)
+          .lte('data_atendimento', endDateStr),
+        // Pending appointments (all time)
+        supabase
+          .from('agendamentos')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pendente'),
+        // Today's appointments
+        supabase
+          .from('agendamentos')
+          .select(`
+            id, data_hora, status, duracao_minutos, origem,
+            cliente:clientes(id, nome, sobrenome),
+            agendamento_servicos(servico:servicos(nome))
+          `)
+          .gte('data_hora', `${formatDateStr(new Date())}T00:00:00`)
+          .lte('data_hora', `${formatDateStr(new Date())}T23:59:59`)
+          .neq('status', 'cancelado')
+          .order('data_hora', { ascending: true })
       ]);
 
       if (clientsRes.error) throw clientsRes.error;
@@ -174,6 +194,9 @@ export default function Dashboard() {
       const clientRecords = clientsRes.data || [];
       const apptRecords = apptsRes.data || [];
       const atendRecords = atendsRes.data || [];
+
+      setPendingAppointments(pendingRes.count ?? 0);
+      setTodayAppointments(todayRes.data || []);
 
       // Update KPI Cards
       setTotalClients(clientRecords.length);
@@ -404,24 +427,7 @@ export default function Dashboard() {
       // Recharts bar horizontal usually renders bottom-to-top, reverse it so highest is at the top
       setTopServicesData(topServices.reverse());
 
-      // --- Chart 5: Appointments by professional ---
-      const profMapCounts = new Map<string, number>();
-      apptRecords.forEach(a => {
-        const prof = Array.isArray(a.profissional) ? a.profissional[0] : (a.profissional as any);
-        const pName = prof 
-          ? `${prof.nome} ${prof.sobrenome}`
-          : 'Sem Profissional';
-        profMapCounts.set(pName, (profMapCounts.get(pName) || 0) + 1);
-      });
-
-      setAppointmentsProfData(
-        Array.from(profMapCounts.entries()).map(([nome, quantidade]) => ({
-          name: nome,
-          Quantidade: quantidade
-        }))
-      );
-
-      // --- Chart 6: Revenue by service category ---
+      // --- Chart 5: Revenue by service category ---
       const catMapRevenue = new Map<string, number>();
       atendRecords.forEach(a => {
         const catName = serviceMap.get(a.servico_id)?.categoriaNome || 'Sem Categoria';
@@ -475,7 +481,7 @@ export default function Dashboard() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h2 className="font-title font-semibold text-2xl text-text-primary">Dashboard</h2>
-            <p className="text-xs text-text-secondary mt-0.5">Visão geral do desempenho e saúde financeira da clínica.</p>
+            <p className="text-xs text-text-secondary mt-0.5">Visão geral do desempenho do seu negócio.</p>
           </div>
 
           {/* Period presets */}
@@ -538,8 +544,8 @@ export default function Dashboard() {
       ) : (
         <>
           {/* KPI CARDS GRID */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
             {/* KPI 1: Clientes */}
             <div className="bg-white border border-border rounded-[14px] p-5 flex items-center justify-between shadow-sm">
               <div className="space-y-1">
@@ -578,6 +584,58 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* KPI 4: Agendamentos Pendentes */}
+            <div className="bg-white border border-amber-200 rounded-[14px] p-5 flex items-center justify-between shadow-sm">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Aguardando Confirmação</span>
+                <p className="text-3xl font-title font-semibold text-amber-700">{pendingAppointments}</p>
+                <p className="text-[10px] text-amber-500">Agendamentos pendentes</p>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                <Briefcase className="w-5 h-5" />
+              </div>
+            </div>
+
+          </div>
+
+          {/* PRÓXIMOS ATENDIMENTOS DO DIA */}
+          <div className="bg-white border border-border rounded-[14px] p-5 shadow-sm">
+            <h3 className="font-title font-semibold text-lg text-text-primary flex items-center gap-2 mb-4">
+              <CalendarDays className="w-5 h-5 text-rose-600" />
+              Próximos Atendimentos de Hoje
+            </h3>
+            {todayAppointments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center text-text-muted bg-rose-50/5 border border-dashed border-border/60 rounded-xl">
+                <Sparkles className="w-7 h-7 text-rose-200 mb-2" />
+                <p className="text-xs font-semibold">Nenhum atendimento agendado para hoje.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {todayAppointments.map((appt: any) => {
+                  const hora = new Date(appt.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                  const cliente = appt.cliente;
+                  const servicos = (appt.agendamento_servicos || []).map((as: any) => as.servico?.nome).filter(Boolean).join(', ');
+                  return (
+                    <div key={appt.id} className="flex items-center gap-4 p-3 rounded-xl border border-border bg-bg/20 hover:bg-bg/50 transition-colors">
+                      <span className="text-sm font-title font-bold text-rose-700 w-12 flex-shrink-0">{hora}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate">
+                          {cliente?.nome} {cliente?.sobrenome}
+                        </p>
+                        <p className="text-[11px] text-text-secondary truncate">{servicos || 'Sem serviços'}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0
+                        ${appt.status === 'confirmado' ? 'bg-rose-100 text-rose-700' : ''}
+                        ${appt.status === 'pendente' ? 'bg-amber-100 text-amber-700' : ''}
+                        ${appt.status === 'concluido' ? 'bg-green-100 text-green-700' : ''}`}
+                      >
+                        {appt.status}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* CHARTS CONTAINER GRID */}
@@ -718,32 +776,6 @@ export default function Dashboard() {
                           contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid rgba(180,150,130,0.2)' }}
                         />
                         <Bar dataKey="Quantidade" fill="#7A2E38" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-
-              {/* Chart 5: Professional appointments */}
-              <div className="bg-white border border-border rounded-[14px] p-5 shadow-sm">
-                <h3 className="font-title font-semibold text-lg text-text-primary flex items-center gap-2 mb-4">
-                  <Users className="w-5 h-5 text-rose-600" />
-                  Agendamentos por profissional
-                </h3>
-                {appointmentsProfData.length === 0 || appointmentsProfData.every(d => d.Quantidade === 0) ? (
-                  renderEmptyState('Sem agendamentos no período.')
-                ) : (
-                  <div className="h-[300px] w-full font-sans text-xs">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={appointmentsProfData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(180,150,130,0.12)" />
-                        <XAxis dataKey="name" tickLine={false} axisLine={false} stroke="var(--text-secondary)" />
-                        <YAxis tickLine={false} axisLine={false} stroke="var(--text-secondary)" allowDecimals={false} />
-                        <Tooltip 
-                          formatter={(value) => [value, 'Agendamentos']}
-                          contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid rgba(180,150,130,0.2)' }}
-                        />
-                        <Bar dataKey="Quantidade" fill="#A85560" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { 
-  Plus, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Plus,
+  ChevronLeft,
+  ChevronRight,
   CalendarDays,
-  Search, 
-  AlertCircle, 
-  X, 
-  Clock, 
-  Coins, 
-  Sparkles, 
-  Users,
+  Search,
+  AlertCircle,
+  X,
+  Clock,
+  Coins,
+  Sparkles,
   Edit2,
   Trash2,
   CheckCircle,
@@ -24,19 +23,6 @@ import type {
   Servico,
   VariacaoServico,
 } from '../types';
-
-// Tipos legados mantidos localmente até refatoração completa desta página
-interface ProfissionalLegado {
-  id: string;
-  nome: string;
-  sobrenome?: string;
-  ativo?: boolean;
-}
-interface HorarioProfissionalLegado {
-  dia_semana: number;
-  hora_inicio: string;
-  hora_fim: string;
-}
 import { registrarLog } from '../utils/log';
 import ConfirmModal from '../components/common/ConfirmModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,9 +36,7 @@ interface AgendamentoServicoInput {
 }
 
 interface AgendamentoWithRelations extends Omit<Agendamento, 'cliente'> {
-  profissional_id?: string; // legado — campo removido do novo schema
   cliente?: { id: string; nome: string; sobrenome: string; whatsapp: string };
-  profissional?: { id: string; nome: string; sobrenome: string };
   agendamento_servicos?: {
     servico_id: string;
     variacao_id: string | null;
@@ -81,11 +65,8 @@ export default function Agendamentos() {
     return d;
   });
 
-  const [selectedProfId, setSelectedProfId] = useState<string>('todos');
-
   // Database Data States
-  const [profissionais, setProfissionais] = useState<ProfissionalLegado[]>([]);
-  const [activeProfissionaisWithHours, setActiveProfissionaisWithHours] = useState<(ProfissionalLegado & { horarios_profissional?: HorarioProfissionalLegado[] })[]>([]);
+  const [workHoursConfig, setWorkHoursConfig] = useState<{ dia_semana: number; hora_inicio: string; hora_fim: string }[]>([]);
   const [servicos, setServicos] = useState<(Servico & { variacoes_servico?: VariacaoServico[] })[]>([]);
   const [agendamentos, setAgendamentos] = useState<AgendamentoWithRelations[]>([]);
   
@@ -127,7 +108,6 @@ export default function Agendamentos() {
   const clientInputRef = useRef<HTMLInputElement>(null);
 
   // Form Fields
-  const [formProfId, setFormProfId] = useState('');
   const [formData, setFormData] = useState('');
   const [formHora, setFormHora] = useState('09:00');
   const [formDuracao, setFormDuracao] = useState(30);
@@ -149,25 +129,17 @@ export default function Agendamentos() {
   // Fetch initial configuration data
   const fetchSetupData = async () => {
     try {
-      const { data: profs, error: profsErr } = await supabase
-        .from('profissionais')
-        .select('*, horarios_profissional(*)')
-        .eq('ativo', true)
-        .order('nome');
-      if (profsErr) throw profsErr;
-      setProfissionais(profs || []);
-      setActiveProfissionaisWithHours(profs || []);
-
-      const { data: srvs, error: srvsErr } = await supabase
-        .from('servicos')
-        .select('*, variacoes_servico(*)')
-        .eq('ativo', true)
-        .order('nome');
-      if (srvsErr) throw srvsErr;
-      setServicos(srvs || []);
+      const [horariosRes, srvsRes] = await Promise.all([
+        supabase.from('horarios_atendimento').select('dia_semana, hora_inicio, hora_fim'),
+        supabase.from('servicos').select('*, variacoes_servico(*)').eq('ativo', true).order('nome')
+      ]);
+      if (horariosRes.error) throw horariosRes.error;
+      if (srvsRes.error) throw srvsRes.error;
+      setWorkHoursConfig(horariosRes.data || []);
+      setServicos(srvsRes.data || []);
     } catch (err) {
       console.error('Erro de setup:', err);
-      showTemporaryError('Falha ao carregar catálogo de serviços ou profissionais.');
+      showTemporaryError('Falha ao carregar catálogo de serviços.');
     }
   };
 
@@ -180,7 +152,6 @@ export default function Agendamentos() {
         .select(`
           *,
           cliente:clientes(id, nome, sobrenome, whatsapp),
-          profissional:profissionais(id, nome, sobrenome),
           agendamento_servicos(
             servico_id,
             variacao_id,
@@ -225,7 +196,6 @@ export default function Agendamentos() {
         const { data, error } = await supabase
           .from('clientes')
           .select('*')
-          .eq('ativo', true)
           .or(`nome.ilike.%${clientSearchQuery}%,sobrenome.ilike.%${clientSearchQuery}%,whatsapp.like.%${clientSearchQuery}%`)
           .limit(5);
 
@@ -302,29 +272,15 @@ export default function Agendamentos() {
   };
 
   // OPEN MODAL FOR NEW APPOINTMENT (FROM SLOT OR BUTTON)
-  const handleOpenForm = (date?: Date, hourStr?: string, profId?: string) => {
+  const handleOpenForm = (date?: Date, hourStr?: string) => {
     setEditingAppt(null);
     setSelectedCliente(null);
     setClientSearchQuery('');
     setFormObs('');
     setSelectedServices({});
     setFormDuracao(0);
-
-    const activeProfs = profissionais.filter(p => p.ativo);
-    setFormProfId(profId || (activeProfs.length > 0 ? activeProfs[0].id : ''));
-
-    if (date) {
-      setFormData(date.toISOString().split('T')[0]);
-    } else {
-      setFormData(new Date().toISOString().split('T')[0]);
-    }
-
-    if (hourStr) {
-      setFormHora(hourStr);
-    } else {
-      setFormHora('09:00');
-    }
-
+    setFormData(date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+    setFormHora(hourStr || '09:00');
     setIsModalOpen(true);
   };
 
@@ -341,11 +297,10 @@ export default function Agendamentos() {
         sobrenome: appt.cliente.sobrenome,
         whatsapp: appt.cliente.whatsapp,
         ativo: true,
-        gestante: false // Mocked
+        gestante: false
       } as Cliente);
     }
 
-    setFormProfId(appt.profissional_id ?? '');
     setFormObs(appt.observacoes || '');
     setFormDuracao(appt.duracao_minutos);
 
@@ -446,11 +401,6 @@ export default function Agendamentos() {
       return;
     }
 
-    if (!formProfId) {
-      showTemporaryError('Por favor, selecione um profissional.');
-      return;
-    }
-
     const servicesList = Object.values(selectedServices);
     if (servicesList.length === 0) {
       showTemporaryError('Selecione pelo menos 1 serviço.');
@@ -472,97 +422,56 @@ export default function Agendamentos() {
       const startHourStr = startDateTime.toLocaleTimeString('pt-BR', { hour12: false });
       const endHourStr = endDateTime.toLocaleTimeString('pt-BR', { hour12: false });
 
-      // 2. Expediente check: query horarios_profissional
-      const { data: workHours, error: whError } = await supabase
-        .from('horarios_profissional')
-        .select('*')
-        .eq('profissional_id', formProfId)
-        .eq('dia_semana', dayOfWeek);
-
-      if (whError) throw whError;
-
-      if (!workHours || workHours.length === 0) {
-        showTemporaryError('O profissional não atende no dia selecionado.');
-        setSaving(false);
-        return;
+      // 2. Expediente check: consult global horarios_atendimento (skip if not configured)
+      if (workHoursConfig.length > 0) {
+        const daySched = workHoursConfig.find(h => h.dia_semana === dayOfWeek);
+        if (!daySched) {
+          showTemporaryError('Não há atendimento configurado para o dia selecionado.');
+          setSaving(false);
+          return;
+        }
+        if (startHourStr < daySched.hora_inicio || endHourStr > daySched.hora_fim) {
+          showTemporaryError(`Horário fora do expediente (${daySched.hora_inicio.substring(0, 5)} - ${daySched.hora_fim.substring(0, 5)}).`);
+          setSaving(false);
+          return;
+        }
       }
 
-      // Check if start and end fall inside work hours
-      const professionalSched = workHours[0];
-      if (startHourStr < professionalSched.hora_inicio || endHourStr > professionalSched.hora_fim) {
-        showTemporaryError(`Horário fora do expediente da profissional (${professionalSched.hora_inicio.substring(0, 5)} - ${professionalSched.hora_fim.substring(0, 5)}).`);
-        setSaving(false);
-        return;
-      }
-
-      // 3. Overlap check for professional (excluding itself if editing)
-      let profQuery = supabase
+      // 3. Overlap check against global agenda (excluding itself if editing)
+      let agendaQuery = supabase
         .from('agendamentos')
         .select('*')
-        .eq('profissional_id', formProfId)
         .neq('status', 'cancelado')
         .gte('data_hora', `${formData}T00:00:00Z`)
         .lte('data_hora', `${formData}T23:59:59Z`);
 
       if (editingAppt) {
-        profQuery = profQuery.neq('id', editingAppt.id);
+        agendaQuery = agendaQuery.neq('id', editingAppt.id);
       }
 
-      const { data: profAppts, error: profApptsErr } = await profQuery;
-      if (profApptsErr) throw profApptsErr;
+      const { data: agendaAppts, error: agendaErr } = await agendaQuery;
+      if (agendaErr) throw agendaErr;
 
-      const profConflict = (profAppts || []).some(appt => {
+      const agendaConflict = (agendaAppts || []).some(appt => {
         const apptStart = new Date(appt.data_hora);
         const apptEnd = new Date(apptStart.getTime() + appt.duracao_minutos * 60000);
         return startDateTime < apptEnd && endDateTime > apptStart;
       });
 
-      if (profConflict) {
-        showTemporaryError('Este profissional já possui outro agendamento neste mesmo horário.');
-        setSaving(false);
-        return;
-      }
-
-      // 4. Overlap check for client (excluding itself if editing)
-      let clientQuery = supabase
-        .from('agendamentos')
-        .select('*')
-        .eq('cliente_id', selectedCliente.id)
-        .neq('status', 'cancelado')
-        .gte('data_hora', `${formData}T00:00:00Z`)
-        .lte('data_hora', `${formData}T23:59:59Z`);
-
-      if (editingAppt) {
-        clientQuery = clientQuery.neq('id', editingAppt.id);
-      }
-
-      const { data: clientAppts, error: clientApptsErr } = await clientQuery;
-      if (clientApptsErr) throw clientApptsErr;
-
-      const clientConflict = (clientAppts || []).some(appt => {
-        const apptStart = new Date(appt.data_hora);
-        const apptEnd = new Date(apptStart.getTime() + appt.duracao_minutos * 60000);
-        return startDateTime < apptEnd && endDateTime > apptStart;
-      });
-
-      if (clientConflict) {
-        showTemporaryError('Esta cliente já possui outro agendamento conflitante neste mesmo horário.');
+      if (agendaConflict) {
+        showTemporaryError('Já existe outro agendamento neste mesmo horário.');
         setSaving(false);
         return;
       }
 
       let apptId = '';
       const clientName = `${selectedCliente.nome} ${selectedCliente.sobrenome}`;
-      const profObj = profissionais.find(p => p.id === formProfId);
-      const profName = `${profObj?.nome} ${profObj?.sobrenome}`;
 
       if (editingAppt) {
-        // Update Cabecalho
         const { error } = await supabase
           .from('agendamentos')
           .update({
             cliente_id: selectedCliente.id,
-            profissional_id: formProfId,
             data_hora: startDateTime.toISOString(),
             duracao_minutos: formDuracao,
             observacoes: formObs.trim() || null
@@ -572,33 +481,27 @@ export default function Agendamentos() {
         if (error) throw error;
         apptId = editingAppt.id;
 
-        // Delete previous services list
-        await supabase
-          .from('agendamento_servicos')
-          .delete()
-          .eq('agendamento_id', apptId);
-
-        await registrarLog('editou', 'agendamento', apptId, `Editou agendamento de "${clientName}" com "${profName}"`);
+        await supabase.from('agendamento_servicos').delete().eq('agendamento_id', apptId);
+        await registrarLog('editou', 'agendamento', apptId, `Editou agendamento de "${clientName}"`);
       } else {
-        // Create agendamento (Header)
         const { data: apptResult, error: apptError } = await supabase
           .from('agendamentos')
           .insert({
             cliente_id: selectedCliente.id,
-            profissional_id: formProfId,
             data_hora: startDateTime.toISOString(),
             duracao_minutos: formDuracao,
             status: 'confirmado',
+            origem: 'admin',
             observacoes: formObs.trim() || null
           })
           .select()
           .single();
 
         if (apptError) throw apptError;
-        if (!apptResult) throw new Error('Falha ao criar cabeçalho do agendamento.');
+        if (!apptResult) throw new Error('Falha ao criar agendamento.');
         apptId = apptResult.id;
 
-        await registrarLog('criou', 'agendamento', apptId, `Criou agendamento para a cliente "${clientName}" com a profissional "${profName}"`);
+        await registrarLog('criou', 'agendamento', apptId, `Criou agendamento para "${clientName}"`);
       }
 
       // 5. Inserir Agendamento Serviços
@@ -623,6 +526,23 @@ export default function Agendamentos() {
       showTemporaryError('Falha ao salvar agendamento.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleConfirmAppointment = async (appt: AgendamentoWithRelations) => {
+    try {
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({ status: 'confirmado' })
+        .eq('id', appt.id);
+      if (error) throw error;
+      const clientName = appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome}` : 'Cliente';
+      await registrarLog('editou', 'agendamento', appt.id, `Confirmou agendamento de "${clientName}"`);
+      showTemporarySuccess('Agendamento confirmado!');
+      fetchAppointments();
+    } catch (err) {
+      console.error(err);
+      showTemporaryError('Falha ao confirmar agendamento.');
     }
   };
 
@@ -696,38 +616,17 @@ export default function Agendamentos() {
   };
 
   // Visual status mapper for calendar blocks
-  const getProfColorStyles = (profId: string, status: string = 'confirmado') => {
-    // 1. If cancelled, return opaque gray style
-    if (status === 'cancelado') {
-      return { 
-        border: 'border-gray-200', 
-        bg: 'bg-gray-100/50 hover:bg-gray-200/50 text-gray-400 line-through opacity-50', 
-        badge: 'bg-gray-200 text-gray-600', 
-        text: 'text-gray-500' 
-      };
+  const getStatusColorStyles = (status: string = 'confirmado') => {
+    switch (status) {
+      case 'cancelado':
+        return { border: 'border-gray-200', bg: 'bg-gray-100/50 hover:bg-gray-200/50 text-gray-400 line-through opacity-50', badge: 'bg-gray-200 text-gray-600', text: 'text-gray-500' };
+      case 'concluido':
+        return { border: 'border-emerald-300', bg: 'bg-emerald-50/90 hover:bg-emerald-100/90 text-emerald-800', badge: 'bg-emerald-200 text-emerald-950', text: 'text-emerald-900' };
+      case 'pendente':
+        return { border: 'border-amber-300', bg: 'bg-amber-50/95 hover:bg-amber-100 text-amber-800', badge: 'bg-amber-200 text-amber-900', text: 'text-amber-900' };
+      default: // confirmado
+        return { border: 'border-rose-300', bg: 'bg-rose-50/95 hover:bg-rose-100 text-rose-800', badge: 'bg-rose-200 text-rose-900', text: 'text-rose-900' };
     }
-
-    // 2. If completed, return emerald success color style
-    if (status === 'concluido') {
-      return { 
-        border: 'border-emerald-300', 
-        bg: 'bg-emerald-50/90 hover:bg-emerald-100/90 text-emerald-800', 
-        badge: 'bg-emerald-200 text-emerald-950', 
-        text: 'text-emerald-900' 
-      };
-    }
-
-    // 3. Otherwise return normal professional color
-    const idx = profissionais.findIndex(p => p.id === profId);
-    const colors = [
-      { border: 'border-rose-300', bg: 'bg-rose-50/95 hover:bg-rose-100 text-rose-800', badge: 'bg-rose-200 text-rose-900', text: 'text-rose-900' },
-      { border: 'border-amber-300', bg: 'bg-amber-50/95 hover:bg-amber-100 text-amber-800', badge: 'bg-amber-200 text-amber-900', text: 'text-amber-900' },
-      { border: 'border-teal-300', bg: 'bg-teal-50/95 hover:bg-teal-100 text-teal-800', badge: 'bg-teal-200 text-teal-900', text: 'text-teal-900' },
-      { border: 'border-sky-300', bg: 'bg-sky-50/95 hover:bg-sky-100 text-sky-800', badge: 'bg-sky-200 text-sky-900', text: 'text-sky-900' },
-      { border: 'border-indigo-300', bg: 'bg-indigo-50/95 hover:bg-indigo-100 text-indigo-800', badge: 'bg-indigo-200 text-indigo-900', text: 'text-indigo-900' },
-      { border: 'border-purple-300', bg: 'bg-purple-50/95 hover:bg-purple-100 text-purple-800', badge: 'bg-purple-200 text-purple-900', text: 'text-purple-900' }
-    ];
-    return colors[idx === -1 ? 0 : idx % colors.length];
   };
 
   // Calendar parameters
@@ -735,41 +634,35 @@ export default function Agendamentos() {
   const endHour = 20;
   const hourSlots = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
 
-  // Availability validation
-  const isProfessionalAvailable = (profId: string, date: Date, hour: number) => {
-    const prof = activeProfissionaisWithHours.find(p => p.id === profId);
-    if (!prof || !prof.horarios_profissional) return false;
-
+  // Availability validation using global horarios_atendimento
+  const isHourAvailable = (date: Date, hour: number) => {
+    if (workHoursConfig.length === 0) return true;
     const dayOfWeek = date.getDay();
-    const sched = prof.horarios_profissional.find((h: HorarioProfissionalLegado) => h.dia_semana === dayOfWeek);
+    const sched = workHoursConfig.find(h => h.dia_semana === dayOfWeek);
     if (!sched) return false;
-
     const hourStr = `${hour.toString().padStart(2, '0')}:00:00`;
     return hourStr >= sched.hora_inicio && hourStr < sched.hora_fim;
   };
 
-  const isAnyProfessionalAvailable = (date: Date, hour: number) => {
-    return activeProfissionaisWithHours.some(prof => isProfessionalAvailable(prof.id, date, hour));
-  };
-
-  const visibleAppointments = agendamentos.filter(appt => {
-    if (selectedProfId !== 'todos' && appt.profissional_id !== selectedProfId) return false;
-    return true;
-  });
+  const visibleAppointments = agendamentos;
 
   return (
     <div className="space-y-6">
-      {/* Top Banners */}
+      {/* Floating Toasts */}
       {errorMessage && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
-          <p className="text-sm font-medium">{errorMessage}</p>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-lg px-4 pointer-events-none">
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-3 shadow-lg animate-fade-in pointer-events-auto">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
+            <p className="text-sm font-medium">{errorMessage}</p>
+          </div>
         </div>
       )}
       {successMessage && (
-        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in">
-          <Sparkles className="w-5 h-5 flex-shrink-0 text-green-600" />
-          <p className="text-sm font-medium">{successMessage}</p>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-lg px-4 pointer-events-none">
+          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-3 shadow-lg animate-fade-in pointer-events-auto">
+            <Sparkles className="w-5 h-5 flex-shrink-0 text-green-600" />
+            <p className="text-sm font-medium">{successMessage}</p>
+          </div>
         </div>
       )}
 
@@ -811,21 +704,6 @@ export default function Agendamentos() {
 
           {/* Filters & Actions */}
           <div className="flex flex-wrap items-center gap-3">
-            
-            {/* Professional Filter */}
-            <div className="flex items-center gap-1.5 bg-bg/50 px-2 py-1 rounded-lg border border-border/60">
-              <Users className="w-3.5 h-3.5 text-rose-600" />
-              <select
-                value={selectedProfId}
-                onChange={(e) => setSelectedProfId(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-text-primary border-none outline-none cursor-pointer py-1 pr-4"
-              >
-                <option value="todos">Todos os Profissionais</option>
-                {profissionais.map(p => (
-                  <option key={p.id} value={p.id}>{p.nome} {p.sobrenome}</option>
-                ))}
-              </select>
-            </div>
 
             {/* View switcher */}
             <div className="flex bg-bg rounded-lg p-0.5 border border-border/40">
@@ -908,14 +786,11 @@ export default function Agendamentos() {
                   <div key={day.toISOString()} className="relative border-r border-border last:border-r-0 h-full group">
                     {/* Hour slots background */}
                     {hourSlots.map(hour => {
-                      const isAvailable = selectedProfId === 'todos' 
-                        ? isAnyProfessionalAvailable(day, hour)
-                        : isProfessionalAvailable(selectedProfId, day, hour);
-
+                      const isAvailable = isHourAvailable(day, hour);
                       return (
-                        <div 
+                        <div
                           key={hour}
-                          onClick={() => isAvailable && handleOpenForm(day, `${hour.toString().padStart(2, '0')}:00`, selectedProfId === 'todos' ? '' : selectedProfId)}
+                          onClick={() => isAvailable && handleOpenForm(day, `${hour.toString().padStart(2, '0')}:00`)}
                           className={`h-[50px] border-b border-border/50 transition-colors cursor-pointer flex items-center justify-center
                             ${isAvailable ? 'hover:bg-rose-50/30' : 'bg-gray-100/55 cursor-not-allowed text-text-muted/40 font-semibold text-[10px]'}`}
                           title={isAvailable ? 'Clique para agendar' : 'Horário indisponível / Fechado'}
@@ -929,20 +804,14 @@ export default function Agendamentos() {
                     {dayAppts.map(appt => {
                       const apptDate = new Date(appt.data_hora);
                       const startHourVal = apptDate.getHours() + apptDate.getMinutes() / 60;
-                      
                       const top = (startHourVal - startHour) * 50;
                       const height = (appt.duracao_minutos / 60) * 50;
-
-                      const colors = getProfColorStyles(appt.profissional_id ?? '', appt.status);
-                      
+                      const colors = getStatusColorStyles(appt.status);
                       return (
                         <div
                           key={appt.id}
                           style={{ top: `${top}px`, height: `${height}px` }}
-                          onClick={(e) => {
-                            e.stopPropagation(); // Stop click from triggering new appt underneath
-                            handleOpenDetail(appt);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); handleOpenDetail(appt); }}
                           className={`absolute left-1.5 right-1.5 rounded-lg border px-2 py-1.5 text-[10px] flex flex-col justify-between overflow-hidden shadow-sm cursor-pointer z-10 transition-all ${colors.border} ${colors.bg}`}
                           title={`${appt.cliente?.nome} ${appt.cliente?.sobrenome} - ${appt.agendamento_servicos?.map(s => s.servico?.nome).join(', ')}`}
                         >
@@ -954,7 +823,9 @@ export default function Agendamentos() {
                           </div>
                           <div className="flex items-center justify-between border-t border-black/5 pt-0.5 mt-0.5 text-[8px] font-semibold opacity-75">
                             <span>🕒 {apptDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                            <span className="truncate max-w-[50px]">👤 {appt.profissional?.nome}</span>
+                            <span className={`px-1 py-0.5 rounded text-[7px] font-bold ${appt.origem === 'portal' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                              {appt.origem === 'portal' ? 'Portal' : 'Manual'}
+                            </span>
                           </div>
                         </div>
                       );
@@ -992,14 +863,11 @@ export default function Agendamentos() {
             {/* Time Grid */}
             <div className="relative h-full">
               {hourSlots.map(hour => {
-                const isAvailable = selectedProfId === 'todos' 
-                  ? isAnyProfessionalAvailable(currentDate, hour)
-                  : isProfessionalAvailable(selectedProfId, currentDate, hour);
-
+                const isAvailable = isHourAvailable(currentDate, hour);
                 return (
-                  <div 
+                  <div
                     key={hour}
-                    onClick={() => isAvailable && handleOpenForm(currentDate, `${hour.toString().padStart(2, '0')}:00`, selectedProfId === 'todos' ? '' : selectedProfId)}
+                    onClick={() => isAvailable && handleOpenForm(currentDate, `${hour.toString().padStart(2, '0')}:00`)}
                     className={`h-[50px] border-b border-border/50 transition-colors cursor-pointer flex items-center justify-center
                       ${isAvailable ? 'hover:bg-rose-50/30' : 'bg-gray-100/55 cursor-not-allowed text-text-muted/40'}`}
                   >
@@ -1017,7 +885,7 @@ export default function Agendamentos() {
                   const top = (startHourVal - startHour) * 50;
                   const height = (appt.duracao_minutos / 60) * 50;
 
-                  const colors = getProfColorStyles(appt.profissional_id ?? '', appt.status);
+                  const colors = getStatusColorStyles(appt.status);
 
                   return (
                     <div
@@ -1029,7 +897,7 @@ export default function Agendamentos() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-bold text-sm text-text-primary leading-snug">
-                            {appt.cliente?.nome} {appt.cliente?.sobrenome} 
+                            {appt.cliente?.nome} {appt.cliente?.sobrenome}
                             <span className="text-xs font-normal text-text-secondary ml-2">({appt.cliente?.whatsapp})</span>
                           </p>
                           <p className="text-xs text-text-secondary mt-0.5">
@@ -1042,7 +910,9 @@ export default function Agendamentos() {
                         </span>
                       </div>
                       <div className="border-t border-black/5 pt-1 mt-1 text-[10px] font-semibold text-text-secondary flex justify-between">
-                        <span>Profissional: <span className="font-bold">{appt.profissional?.nome} {appt.profissional?.sobrenome}</span></span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${appt.origem === 'portal' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {appt.origem === 'portal' ? 'Portal' : 'Manual'}
+                        </span>
                         <span>Total: R$ {appt.agendamento_servicos?.reduce((sum, s) => sum + Number(s.valor_cobrado), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                       </div>
                     </div>
@@ -1083,7 +953,7 @@ export default function Agendamentos() {
 
                   <div className="flex-1 overflow-y-auto space-y-1 mt-1.5">
                     {dayAppts.slice(0, 3).map(appt => {
-                      const colors = getProfColorStyles(appt.profissional_id ?? '', appt.status);
+                      const colors = getStatusColorStyles(appt.status);
                       return (
                         <div 
                           key={appt.id} 
@@ -1149,6 +1019,7 @@ export default function Agendamentos() {
                 {/* Status Badge */}
                 <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider
                   ${selectedAppt.status === 'confirmado' ? 'bg-rose-100 text-rose-800 border border-rose-200' : ''}
+                  ${selectedAppt.status === 'pendente' ? 'bg-amber-100 text-amber-700 border border-amber-200' : ''}
                   ${selectedAppt.status === 'concluido' ? 'bg-green-100 text-green-800 border border-green-200' : ''}
                   ${selectedAppt.status === 'cancelado' ? 'bg-gray-100 text-gray-500 border border-gray-200' : ''}
                 `}>
@@ -1158,11 +1029,17 @@ export default function Agendamentos() {
 
               {/* Main parameters */}
               <div className="space-y-3.5 text-xs">
-                
-                {/* Professional */}
+
+                {/* Origem */}
                 <div className="grid grid-cols-[100px_1fr] border-b border-border/40 pb-2">
-                  <span className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Profissional:</span>
-                  <span className="text-text-primary font-medium">{selectedAppt.profissional?.nome} {selectedAppt.profissional?.sobrenome}</span>
+                  <span className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Origem:</span>
+                  <span>
+                    {selectedAppt.origem === 'portal' ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Portal</span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Manual</span>
+                    )}
+                  </span>
                 </div>
 
                 {/* Date / Time */}
@@ -1215,9 +1092,27 @@ export default function Agendamentos() {
 
               {/* Status & Edit Controls */}
               <div className="pt-2 border-t border-border flex flex-col gap-2">
-                
-                {/* Only display confirm/cancel/edit buttons if status is confirmed */}
-                {selectedAppt.status === 'confirmado' ? (
+
+                {selectedAppt.status === 'pendente' && (
+                  <>
+                    <button
+                      onClick={() => handleConfirmAppointment(selectedAppt)}
+                      className="flex items-center justify-center gap-1.5 py-2 w-full bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Confirmar Agendamento
+                    </button>
+                    <button
+                      onClick={() => handleChangeStatus(selectedAppt, 'cancelado')}
+                      className="flex items-center justify-center gap-1.5 py-2 px-3 border border-red-200 hover:bg-red-50 text-red-600 rounded-lg text-xs font-semibold cursor-pointer"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Recusar / Cancelar
+                    </button>
+                  </>
+                )}
+
+                {selectedAppt.status === 'confirmado' && (
                   <>
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -1227,7 +1122,6 @@ export default function Agendamentos() {
                         <CheckCircle className="w-4 h-4" />
                         Concluir Atendimento
                       </button>
-
                       <button
                         onClick={() => handleChangeStatus(selectedAppt, 'cancelado')}
                         className="flex items-center justify-center gap-1.5 py-2 px-3 border border-red-200 hover:bg-red-50 text-red-600 rounded-lg text-xs font-semibold cursor-pointer"
@@ -1236,7 +1130,6 @@ export default function Agendamentos() {
                         Cancelar
                       </button>
                     </div>
-
                     <button
                       onClick={() => handleOpenEditForm(selectedAppt)}
                       className="flex items-center justify-center gap-1.5 py-2 w-full bg-rose-600 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
@@ -1245,7 +1138,9 @@ export default function Agendamentos() {
                       Editar Agendamento
                     </button>
                   </>
-                ) : (
+                )}
+
+                {(selectedAppt.status === 'concluido' || selectedAppt.status === 'cancelado') && (
                   <p className="text-[11px] text-text-secondary italic text-center py-1 bg-bg rounded">
                     Agendamentos concluídos ou cancelados não podem ser editados.
                   </p>
@@ -1362,24 +1257,6 @@ export default function Agendamentos() {
                     )}
                   </>
                 )}
-              </div>
-
-              {/* Profissional Selection */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                  Profissional *
-                </label>
-                <select
-                  required
-                  value={formProfId}
-                  onChange={(e) => setFormProfId(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-pointer"
-                >
-                  <option value="" disabled>Selecione a profissional</option>
-                  {profissionais.map(p => (
-                    <option key={p.id} value={p.id}>{p.nome} {p.sobrenome}</option>
-                  ))}
-                </select>
               </div>
 
               {/* Data & Horário Início */}

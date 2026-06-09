@@ -1,19 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { 
-  ArrowLeft, 
-  User, 
-  FileText, 
-  History, 
-  Plus, 
-  Save, 
-  AlertCircle, 
-  X, 
-  Clock, 
-  Sparkles, 
-  UserCheck, 
-  Power,
+import {
+  ArrowLeft,
+  User,
+  FileText,
+  History,
+  Plus,
+  Save,
+  AlertCircle,
+  X,
+  Clock,
+  Sparkles,
   Calendar
 } from 'lucide-react';
 import type { Cliente, Atendimento, Servico, VariacaoServico } from '../types';
@@ -22,7 +20,6 @@ import { registrarLog } from '../utils/log';
 interface AtendimentoWithRelations extends Atendimento {
   servicos?: { nome: string };
   variacoes_servico?: { nome: string };
-  profissionais?: { nome: string; sobrenome: string };
 }
 
 interface ServicoWithVariations extends Servico {
@@ -37,7 +34,6 @@ export default function PerfilCliente() {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [atendimentos, setAtendimentos] = useState<AtendimentoWithRelations[]>([]);
   const [servicos, setServicos] = useState<ServicoWithVariations[]>([]);
-  const [profissionais, setProfissionais] = useState<{ id: string; nome: string; sobrenome?: string }[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,7 +66,6 @@ export default function PerfilCliente() {
   const [atendimentoData, setAtendimentoData] = useState('');
   const [atendimentoServicoId, setAtendimentoServicoId] = useState('');
   const [atendimentoVariacaoId, setAtendimentoVariacaoId] = useState('');
-  const [atendimentoProfissionalId, setAtendimentoProfissionalId] = useState('');
   const [atendimentoValor, setAtendimentoValor] = useState<number>(0);
   const [atendimentoObs, setAtendimentoObs] = useState('');
 
@@ -122,12 +117,7 @@ export default function PerfilCliente() {
       // 2. Fetch history
       const { data: histData, error: histError } = await supabase
         .from('atendimentos')
-        .select(`
-          *,
-          servicos ( nome ),
-          variacoes_servico ( nome ),
-          profissionais ( nome, sobrenome )
-        `)
+        .select('*, servicos(nome), variacoes_servico(nome)')
         .eq('cliente_id', id)
         .order('data_atendimento', { ascending: false });
 
@@ -144,16 +134,6 @@ export default function PerfilCliente() {
       if (srvError) throw srvError;
       setServicos(srvData || []);
 
-      // 4. Fetch active professionals
-      const { data: profData, error: profError } = await supabase
-        .from('profissionais')
-        .select('*')
-        .eq('ativo', true)
-        .order('nome', { ascending: true });
-
-      if (profError) throw profError;
-      setProfissionais(profData || []);
-
     } catch (err) {
       console.error('Erro ao buscar dados do cliente:', err);
       showTemporaryError('Falha ao carregar dados do prontuário.');
@@ -166,25 +146,6 @@ export default function PerfilCliente() {
     fetchClienteData();
   }, [id]);
 
-  // TOGGLE CLIENT STATUS
-  const handleToggleClienteStatus = async () => {
-    if (!cliente) return;
-    const newStatus = !cliente.ativo;
-    try {
-      const { error } = await supabase
-        .from('clientes')
-        .update({ ativo: newStatus })
-        .eq('id', cliente.id);
-
-      if (error) throw error;
-      await registrarLog('editou', 'cliente', cliente.id, `${newStatus ? 'Ativou' : 'Desativou'} cliente "${cliente.nome} ${cliente.sobrenome}"`);
-      setCliente(prev => prev ? { ...prev, ativo: newStatus } : null);
-      showTemporarySuccess(`Status alterado para ${newStatus ? 'Ativo' : 'Inativo'}.`);
-    } catch (err) {
-      console.error(err);
-      showTemporaryError('Erro ao atualizar status do cliente.');
-    }
-  };
 
   // SAVE PERSONAL DATA
   const handleSavePersonalData = async (e: React.FormEvent) => {
@@ -208,7 +169,6 @@ export default function PerfilCliente() {
           data_nascimento: dataNascimento || null,
           cpf: cpf.trim() || null,
           endereco: endereco.trim() || null,
-          como_conheceu: comoConheceu || null
         })
         .eq('id', cliente.id);
 
@@ -241,8 +201,6 @@ export default function PerfilCliente() {
         .from('clientes')
         .update({
           alergias: alergias.trim() || null,
-          tipo_pele: tipoPele || null,
-          restricoes: restricoes.trim() || null,
           medicamentos: medicamentos.trim() || null,
           gestante,
           doencas_cronicas: doencasCronicas.trim() || null,
@@ -264,12 +222,10 @@ export default function PerfilCliente() {
 
   // OPEN ATENDIMENTO MODAL
   const handleOpenAtendimentoModal = () => {
-    // Set default values
     const todayStr = new Date().toISOString().split('T')[0];
     setAtendimentoData(todayStr);
     setAtendimentoServicoId('');
     setAtendimentoVariacaoId('');
-    setAtendimentoProfissionalId(profissionais.length > 0 ? profissionais[0].id : '');
     setAtendimentoValor(0);
     setAtendimentoObs('');
     setIsAtendimentoModalOpen(true);
@@ -314,8 +270,8 @@ export default function PerfilCliente() {
     e.preventDefault();
     if (!cliente) return;
 
-    if (!atendimentoData || !atendimentoServicoId || !atendimentoProfissionalId) {
-      showTemporaryError('Data, serviço e profissional são obrigatórios.');
+    if (!atendimentoData || !atendimentoServicoId) {
+      showTemporaryError('Data e serviço são obrigatórios.');
       return;
     }
 
@@ -330,7 +286,6 @@ export default function PerfilCliente() {
       
       const payload = {
         cliente_id: cliente.id,
-        profissional_id: atendimentoProfissionalId,
         servico_id: atendimentoServicoId,
         variacao_id: atendimentoVariacaoId || null,
         data_atendimento: atendimentoData,
@@ -397,17 +352,21 @@ export default function PerfilCliente() {
 
   return (
     <div className="space-y-6">
-      {/* Top Banners */}
+      {/* Floating Toasts */}
       {errorMessage && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
-          <p className="text-sm font-medium">{errorMessage}</p>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-lg px-4 pointer-events-none">
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-3 shadow-lg animate-fade-in pointer-events-auto">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
+            <p className="text-sm font-medium">{errorMessage}</p>
+          </div>
         </div>
       )}
       {successMessage && (
-        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in">
-          <Sparkles className="w-5 h-5 flex-shrink-0 text-green-600" />
-          <p className="text-sm font-medium">{successMessage}</p>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-lg px-4 pointer-events-none">
+          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-3 shadow-lg animate-fade-in pointer-events-auto">
+            <Sparkles className="w-5 h-5 flex-shrink-0 text-green-600" />
+            <p className="text-sm font-medium">{successMessage}</p>
+          </div>
         </div>
       )}
 
@@ -444,16 +403,6 @@ export default function PerfilCliente() {
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Status Switcher Button */}
-          <button
-            onClick={handleToggleClienteStatus}
-            className={`flex items-center justify-center gap-1.5 px-3 py-2 border rounded-lg text-xs font-medium transition-colors cursor-pointer ${cliente.ativo
-              ? 'border-gray-200 hover:bg-gray-50 text-text-secondary'
-              : 'border-green-200 hover:bg-green-50 text-green-600'}`}
-          >
-            <Power className="w-4 h-4" />
-            {cliente.ativo ? 'Desativar Cliente' : 'Ativar Cliente'}
-          </button>
 
           {/* Static New Appointment */}
           <button
@@ -811,11 +760,6 @@ export default function PerfilCliente() {
                               )}
                             </h4>
 
-                            <p className="text-[11px] text-text-secondary flex items-center gap-1 mt-1">
-                              <UserCheck className="w-3 h-3 text-text-muted" />
-                              Atendido por: <span className="font-semibold">{atend.profissionais?.nome} {atend.profissionais?.sobrenome}</span>
-                            </p>
-
                             {atend.observacoes && (
                               <div className="mt-3 text-xs text-text-secondary bg-white border border-border/40 p-2.5 rounded-lg leading-relaxed italic">
                                 "{atend.observacoes}"
@@ -902,24 +846,6 @@ export default function PerfilCliente() {
                   </select>
                 </div>
               )}
-
-              {/* Profissional Selection */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                  Profissional que Atendeu *
-                </label>
-                <select
-                  required
-                  value={atendimentoProfissionalId}
-                  onChange={(e) => setAtendimentoProfissionalId(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-pointer"
-                >
-                  <option value="" disabled>Selecione o profissional</option>
-                  {profissionais.map(p => (
-                    <option key={p.id} value={p.id}>{p.nome} {p.sobrenome}</option>
-                  ))}
-                </select>
-              </div>
 
               {/* Valor Cobrado */}
               <div className="space-y-1.5">

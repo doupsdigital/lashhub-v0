@@ -21,6 +21,7 @@ interface ClienteWithAttendances extends Cliente {
 export default function Clientes() {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState<ClienteWithAttendances[]>([]);
+  const [portalClienteIds, setPortalClienteIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -48,24 +49,30 @@ export default function Clientes() {
   const [dataNascimento, setDataNascimento] = useState('');
   const [cpf, setCpf] = useState('');
   const [endereco, setEndereco] = useState('');
-  const [comoConheceu, setComoConheceu] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch clients and join with their attendances
-      const { data, error } = await supabase
-        .from('clientes')
-        .select(`
-          *,
-          atendimentos (
-            data_atendimento
-          )
-        `)
-        .order('nome', { ascending: true });
+      const [clientesRes, usuariosRes] = await Promise.all([
+        supabase
+          .from('clientes')
+          .select('*, atendimentos(data_atendimento)')
+          .order('nome', { ascending: true }),
+        supabase
+          .from('usuarios')
+          .select('cliente_id')
+          .not('cliente_id', 'is', null)
+      ]);
 
-      if (error) throw error;
-      setClientes(data || []);
+      if (clientesRes.error) throw clientesRes.error;
+      setClientes(clientesRes.data || []);
+
+      const ids = new Set<string>(
+        (usuariosRes.data || [])
+          .map(u => u.cliente_id)
+          .filter(Boolean) as string[]
+      );
+      setPortalClienteIds(ids);
     } catch (err) {
       console.error('Erro ao buscar clientes:', err);
       showTemporaryError('Falha ao carregar clientes do banco.');
@@ -141,7 +148,6 @@ export default function Clientes() {
     setDataNascimento('');
     setCpf('');
     setEndereco('');
-    setComoConheceu('');
     setIsModalOpen(true);
   };
 
@@ -177,8 +183,6 @@ export default function Clientes() {
         data_nascimento: dataNascimento || null,
         cpf: cpf.trim() || null,
         endereco: endereco.trim() || null,
-        como_conheceu: comoConheceu || null,
-        ativo: true
       };
 
       const { data: newClient, error: insertError } = await supabase
@@ -219,11 +223,9 @@ export default function Clientes() {
       fullName.includes(searchTerm.toLowerCase()) || 
       (client.whatsapp || '').includes(searchTerm);
 
-    // 2. Status filter
-    const statusMatch = 
-      statusFilter === 'todos' ||
-      (statusFilter === 'ativos' && client.ativo) ||
-      (statusFilter === 'inativos' && !client.ativo);
+    // 2. Status filter (no ativo field in schema — all clients are active)
+    const statusMatch =
+      statusFilter === 'todos' || statusFilter === 'ativos';
 
     // 3. Period filter (on created_at)
     if (!client.created_at) return searchMatch && statusMatch;
@@ -247,11 +249,13 @@ export default function Clientes() {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner Alert for Errors */}
+      {/* Floating Toast for Errors */}
       {errorMessage && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-3 animate-fade-in">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
-          <p className="text-sm font-medium">{errorMessage}</p>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-lg px-4 pointer-events-none">
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-3 shadow-lg animate-fade-in pointer-events-auto">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
+            <p className="text-sm font-medium">{errorMessage}</p>
+          </div>
         </div>
       )}
 
@@ -369,6 +373,7 @@ export default function Clientes() {
                   <th className="px-6 py-4">WhatsApp</th>
                   <th className="px-6 py-4">Email</th>
                   <th className="px-6 py-4">Último Atendimento</th>
+                  <th className="px-6 py-4">Origem</th>
                   <th className="px-6 py-4">Status</th>
                 </tr>
               </thead>
@@ -378,10 +383,10 @@ export default function Clientes() {
                   const lastAttendance = getLastAttendanceDate(client);
                   
                   return (
-                    <tr 
+                    <tr
                       key={client.id}
                       onClick={() => navigate(`/clientes/${client.id}`)}
-                      className={`hover:bg-bg/25 transition-colors cursor-pointer group ${!client.ativo ? 'opacity-60 bg-gray-50/20' : ''}`}
+                      className="hover:bg-bg/25 transition-colors cursor-pointer group"
                     >
                       {/* Avatar + Name */}
                       <td className="px-6 py-4 flex items-center gap-3">
@@ -409,13 +414,22 @@ export default function Clientes() {
                       <td className="px-6 py-4 text-sm text-text-secondary">
                         {lastAttendance}
                       </td>
+                      {/* Origem */}
+                      <td className="px-6 py-4">
+                        {portalClienteIds.has(client.id) ? (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider bg-blue-100 text-blue-700">
+                            Portal
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider bg-gray-100 text-gray-500">
+                            Manual
+                          </span>
+                        )}
+                      </td>
                       {/* Status */}
                       <td className="px-6 py-4">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${client.ativo 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-500'}`}
-                        >
-                          {client.ativo ? 'Ativo' : 'Inativo'}
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider bg-green-100 text-green-800">
+                          Ativo
                         </span>
                       </td>
                     </tr>
@@ -563,23 +577,6 @@ export default function Clientes() {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                      Como conheceu a clínica?
-                    </label>
-                    <select
-                      value={comoConheceu}
-                      onChange={(e) => setComoConheceu(e.target.value)}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-pointer"
-                    >
-                      <option value="">Selecione uma opção</option>
-                      <option value="Instagram">Instagram</option>
-                      <option value="Indicação">Indicação</option>
-                      <option value="Google">Google</option>
-                      <option value="Passando na rua">Passando na rua</option>
-                      <option value="Outro">Outro</option>
-                    </select>
-                  </div>
                 </div>
 
                 <div className="space-y-1.5">

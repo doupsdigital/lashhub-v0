@@ -13,12 +13,11 @@ export const registrarLog = async (
   descricao: string
 ) => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
     await supabase.from('logs').insert({
-      usuario_nome: currentUsuarioNome,
+      usuario_id: user?.id || null,
       acao,
-      entidade,
-      entidade_id: entidadeId,
-      descricao
+      detalhes: { entidade, entidade_id: entidadeId, descricao, usuario_nome: currentUsuarioNome }
     });
   } catch (err) {
     console.error('Erro ao registrar log de atividade:', err);
