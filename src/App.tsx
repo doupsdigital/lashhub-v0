@@ -15,15 +15,10 @@ import MeusHorarios from './pages/MeusHorarios';
 import CadastroCliente from './pages/portal/CadastroCliente';
 import PortalCatalogo from './pages/portal/PortalCatalogo';
 import PortalAgendar from './pages/portal/PortalAgendar';
+import PortalMeusAgendamentos from './pages/portal/PortalMeusAgendamentos';
+import PortalPerfil from './pages/portal/PortalPerfil';
 
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-text-primary">{title}</h1>
-      <p className="text-text-secondary mt-2">Em breve...</p>
-    </div>
-  );
-}
+
 
 export default function App() {
   return (
@@ -65,8 +60,9 @@ export default function App() {
             <Route index element={<Navigate to="catalogo" replace />} />
             <Route path="catalogo" element={<PortalCatalogo />} />
             <Route path="agendar" element={<PortalAgendar />} />
-            <Route path="meus-agendamentos" element={<Placeholder title="Meus Agendamentos" />} />
-            <Route path="perfil" element={<Placeholder title="Meu Perfil" />} />
+            <Route path="meus-agendamentos" element={<PortalMeusAgendamentos />} />
+            <Route path="perfil" element={<PortalPerfil />} />
+
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
