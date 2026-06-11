@@ -58,7 +58,7 @@ const DIAS_SEMANA = [
 
 export default function Agendamentos() {
   const { isProfissional } = useAuth();
-  const [viewMode, setViewMode] = useState<'mensal' | 'semanal' | 'diaria'>('semanal');
+  const [viewMode, setViewMode] = useState<'mensal' | 'semanal' | 'diaria'>('mensal');
   const [currentDate, setCurrentDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(12, 0, 0, 0);

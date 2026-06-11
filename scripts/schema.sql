@@ -21,6 +21,7 @@ CREATE TABLE clientes (
   medicamentos TEXT,
   doencas_cronicas TEXT,
   gestante BOOLEAN DEFAULT false,
+  anamnese_lash JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -129,6 +130,8 @@ CREATE TABLE configuracao_negocio (
   aprovacao_automatica BOOLEAN DEFAULT false,
   antecedencia_cancelamento_horas INTEGER DEFAULT 24,
   mensagem_pos_agendamento TEXT DEFAULT 'Seu agendamento foi recebido! Aguarde a confirmação.',
+  paleta_cores TEXT DEFAULT 'rosa_rose',
+  modo_escuro BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

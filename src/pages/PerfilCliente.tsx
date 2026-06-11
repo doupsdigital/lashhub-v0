@@ -12,7 +12,11 @@ import {
   X,
   Clock,
   Sparkles,
-  Calendar
+  Calendar,
+  Eye,
+  Moon,
+  HeartPulse,
+  ShieldAlert
 } from 'lucide-react';
 import type { Cliente, Atendimento, Servico, VariacaoServico } from '../types';
 import { registrarLog } from '../utils/log';
@@ -60,12 +64,25 @@ export default function PerfilCliente() {
 
   // Form States - Anamnese
   const [alergias, setAlergias] = useState('');
-  const [tipoPele, setTipoPele] = useState('');
-  const [restricoes, setRestricoes] = useState('');
   const [medicamentos, setMedicamentos] = useState('');
   const [gestante, setGestante] = useState(false);
   const [doencasCronicas, setDoencasCronicas] = useState('');
   const [observacoes, setObservacoes] = useState('');
+
+  // Form States - Anamnese Lash
+  const [fezExtensaoAntes, setFezExtensaoAntes] = useState(false);
+  const [reacaoAlergicaAnterior, setReacaoAlergicaAnterior] = useState(false);
+  const [usaLentesContato, setUsaLentesContato] = useState(false);
+  const [olhosSensiveis, setOlhosSensiveis] = useState(false);
+  const [doencasOculares, setDoencasOculares] = useState(false);
+  const [habitoEsfregarOlhos, setHabitoEsfregarOlhos] = useState(false);
+  const [posicaoDormir, setPosicaoDormir] = useState<'lado' | 'costas' | 'de_brucos' | 'variada' | ''>('');
+  const [maquiagemProvaAgua, setMaquiagemProvaAgua] = useState(false);
+  const [exposicaoCalorAgua, setExposicaoCalorAgua] = useState(false);
+  const [problemasTireoide, setProblemasTireoide] = useState(false);
+  const [quimioterapiaRecente, setQuimioterapiaRecente] = useState(false);
+  const [quedaCabeloAlopecia, setQuedaCabeloAlopecia] = useState(false);
+  const [alergiaProdutos, setAlergiaProdutos] = useState(false);
 
   // Form States - Novo Atendimento
   const [atendimentoData, setAtendimentoData] = useState('');
@@ -112,12 +129,26 @@ export default function PerfilCliente() {
 
       // Load Form states - Anamnese
       setAlergias(clientData.alergias || '');
-      setTipoPele(clientData.tipo_pele || '');
-      setRestricoes(clientData.restricoes || '');
       setMedicamentos(clientData.medicamentos || '');
       setGestante(!!clientData.gestante);
       setDoencasCronicas(clientData.doencas_cronicas || '');
       setObservacoes(clientData.observacoes || '');
+
+      // Load Form states - Anamnese Lash
+      const lashData = clientData.anamnese_lash || {};
+      setFezExtensaoAntes(!!lashData.fez_extensao_antes);
+      setReacaoAlergicaAnterior(!!lashData.reacao_alergica_anterior);
+      setUsaLentesContato(!!lashData.usa_lentes_contato);
+      setOlhosSensiveis(!!lashData.olhos_sensiveis);
+      setDoencasOculares(!!lashData.doencas_oculares);
+      setHabitoEsfregarOlhos(!!lashData.habito_esfregar_olhos);
+      setPosicaoDormir(lashData.posicao_dormir || '');
+      setMaquiagemProvaAgua(!!lashData.maquiagem_prova_agua);
+      setExposicaoCalorAgua(!!lashData.exposicao_calor_agua);
+      setProblemasTireoide(!!lashData.problemas_tireoide);
+      setQuimioterapiaRecente(!!lashData.quimioterapia_recente);
+      setQuedaCabeloAlopecia(!!lashData.queda_cabelo_alopecia);
+      setAlergiaProdutos(!!lashData.alergia_produtos);
 
       // 2. Fetch history (combine manual records and concluded appointments)
       const [histRes, concludedRes] = await Promise.all([
@@ -255,7 +286,22 @@ export default function PerfilCliente() {
           medicamentos: medicamentos.trim() || null,
           gestante,
           doencas_cronicas: doencasCronicas.trim() || null,
-          observacoes: observacoes.trim() || null
+          observacoes: observacoes.trim() || null,
+          anamnese_lash: {
+            fez_extensao_antes: fezExtensaoAntes,
+            reacao_alergica_anterior: reacaoAlergicaAnterior,
+            usa_lentes_contato: usaLentesContato,
+            olhos_sensiveis: olhosSensiveis,
+            doencas_oculares: doencasOculares,
+            habito_esfregar_olhos: habitoEsfregarOlhos,
+            posicao_dormir: posicaoDormir,
+            maquiagem_prova_agua: maquiagemProvaAgua,
+            exposicao_calor_agua: exposicaoCalorAgua,
+            problemas_tireoide: problemasTireoide,
+            quimioterapia_recente: quimioterapiaRecente,
+            queda_cabelo_alopecia: quedaCabeloAlopecia,
+            alergia_produtos: alergiaProdutos,
+          }
         })
         .eq('id', cliente.id);
 
@@ -650,97 +696,249 @@ export default function PerfilCliente() {
               </form>
             )}
 
-            {/* TAB: ANAMNESE */}
+                   {/* TAB: ANAMNESE */}
             {activeTab === 'anamnese' && (
-              <form onSubmit={handleSaveAnamnese} className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Tipo de Pele</label>
-                    <select
-                      value={tipoPele}
-                      onChange={(e) => setTipoPele(e.target.value)}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-pointer"
-                    >
-                      <option value="">Não avaliado</option>
-                      <option value="Normal">Normal</option>
-                      <option value="Oleosa">Oleosa</option>
-                      <option value="Seca">Seca</option>
-                      <option value="Mista">Mista</option>
-                      <option value="Sensível">Sensível</option>
-                    </select>
+              <form onSubmit={handleSaveAnamnese} className="space-y-6 animate-fade-in">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* CARD 1: Histórico & Cuidados Oculares */}
+                  <div className="bg-bg/10 border border-border/80 rounded-xl p-5 space-y-4 shadow-sm">
+                    <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                      <Eye className="w-4 h-4 text-rose-500" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">Histórico & Cuidados Oculares</h3>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {/* Já fez extensão de cílios antes */}
+                      <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                        <input 
+                          type="checkbox"
+                          checked={fezExtensaoAntes}
+                          onChange={(e) => setFezExtensaoAntes(e.target.checked)}
+                          className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                        />
+                        <span className="text-xs font-medium text-text-secondary">Já realizou extensão de cílios anteriormente?</span>
+                      </label>
+
+                      {/* Se sim, teve reação alérgica anterior? */}
+                      {fezExtensaoAntes && (
+                        <label className="flex items-center gap-3 p-2.5 bg-rose-50/20 rounded-lg border border-rose-100/40 cursor-pointer select-none w-full transition-colors hover:bg-rose-50/35 pl-6 animate-slide-up">
+                          <input 
+                            type="checkbox"
+                            checked={reacaoAlergicaAnterior}
+                            onChange={(e) => setReacaoAlergicaAnterior(e.target.checked)}
+                            className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-semibold text-rose-800">Teve reação alérgica a extensões anteriores?</span>
+                        </label>
+                      )}
+
+                      {/* Usa lentes de contato */}
+                      <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                        <input 
+                          type="checkbox"
+                          checked={usaLentesContato}
+                          onChange={(e) => setUsaLentesContato(e.target.checked)}
+                          className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                        />
+                        <span className="text-xs font-medium text-text-secondary">Usa lentes de contato? (remover no procedimento)</span>
+                      </label>
+
+                      {/* Olhos sensíveis / lacrimejamento */}
+                      <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                        <input 
+                          type="checkbox"
+                          checked={olhosSensiveis}
+                          onChange={(e) => setOlhosSensiveis(e.target.checked)}
+                          className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                        />
+                        <span className="text-xs font-medium text-text-secondary">Olhos sensíveis, lacrimejamento fácil ou olho seco?</span>
+                      </label>
+
+                      {/* Doenças oculares recentes */}
+                      <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                        <input 
+                          type="checkbox"
+                          checked={doencasOculares}
+                          onChange={(e) => setDoencasOculares(e.target.checked)}
+                          className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                        />
+                        <span className="text-xs font-medium text-text-secondary">Infecção ocular recente (blefarite, conjuntivite, terçol)?</span>
+                      </label>
+
+                      {/* Hábito de esfregar os olhos */}
+                      <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                        <input 
+                          type="checkbox"
+                          checked={habitoEsfregarOlhos}
+                          onChange={(e) => setHabitoEsfregarOlhos(e.target.checked)}
+                          className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                        />
+                        <span className="text-xs font-medium text-text-secondary">Hábito de esfregar ou tocar os olhos/cílios?</span>
+                      </label>
+                    </div>
                   </div>
 
-                  {/* Gestante Checkbox */}
-                  <div className="flex items-center h-full sm:pt-6">
-                    <label className="flex items-center gap-3 p-3 bg-bg/40 rounded-lg border border-border/60 cursor-pointer w-full select-none">
-                      <input 
-                        type="checkbox"
-                        checked={gestante}
-                        onChange={(e) => setGestante(e.target.checked)}
-                        className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
-                      />
-                      <span className="text-xs font-semibold text-text-primary uppercase tracking-wide">Gestante ou Amamentando</span>
-                    </label>
-                  </div>
-                </div>
+                  {/* CARD 2: Hábitos & Estilo de Vida */}
+                  <div className="bg-bg/10 border border-border/80 rounded-xl p-5 space-y-4 shadow-sm h-fit">
+                    <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                      <Moon className="w-4 h-4 text-rose-500" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">Hábitos & Retenção</h3>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {/* Posição de dormir */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Como costuma dormir?</label>
+                        <select
+                          value={posicaoDormir}
+                          onChange={(e) => setPosicaoDormir(e.target.value as any)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-pointer"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="lado">De Lado (impacta lateral da extensão)</option>
+                          <option value="costas">De Costas (ideal para retenção)</option>
+                          <option value="de_brucos">De Bruços (atrito severo)</option>
+                          <option value="variada">Variada / Alternada</option>
+                        </select>
+                      </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Alergias</label>
-                    <input 
-                      type="text" 
-                      placeholder="Ex: Ácido salicílico, iodo..."
-                      value={alergias}
-                      onChange={(e) => setAlergias(e.target.value)}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400"
-                    />
+                      <div className="space-y-3 pt-1">
+                        {/* Costuma usar rímel/maquiagem à prova d'água */}
+                        <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                          <input 
+                            type="checkbox"
+                            checked={maquiagemProvaAgua}
+                            onChange={(e) => setMaquiagemProvaAgua(e.target.checked)}
+                            className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-text-secondary">Usa rímel ou maquiagem à prova d'água nos olhos?</span>
+                        </label>
+
+                        {/* Contato frequente com calor, piscina, vapor */}
+                        <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                          <input 
+                            type="checkbox"
+                            checked={exposicaoCalorAgua}
+                            onChange={(e) => setExposicaoCalorAgua(e.target.checked)}
+                            className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-text-secondary">Contato frequente com vapor, calor, sauna ou piscina?</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Restrições / Contraindicações</label>
-                    <input 
-                      type="text" 
-                      placeholder="Ex: Queloides, marca-passo..."
-                      value={restricoes}
-                      onChange={(e) => setRestricoes(e.target.value)}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400"
-                    />
-                  </div>
-                </div>
+                  {/* CARD 3: Condições Clínicas & Hormonais */}
+                  <div className="bg-bg/10 border border-border/80 rounded-xl p-5 space-y-4 md:col-span-2 shadow-sm">
+                    <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                      <HeartPulse className="w-4 h-4 text-rose-500" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">Condições Clínicas & Fatores Hormonais (Podem afetar a retenção)</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        {/* Gestante ou Lactante */}
+                        <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                          <input 
+                            type="checkbox"
+                            checked={gestante}
+                            onChange={(e) => setGestante(e.target.checked)}
+                            className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-text-secondary">Gestante ou Lactante?</span>
+                        </label>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Medicamentos em uso</label>
-                    <input 
-                      type="text" 
-                      placeholder="Ex: Roacutan, anticoagulantes..."
-                      value={medicamentos}
-                      onChange={(e) => setMedicamentos(e.target.value)}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400"
-                    />
+                        {/* Problemas de tireoide */}
+                        <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                          <input 
+                            type="checkbox"
+                            checked={problemasTireoide}
+                            onChange={(e) => setProblemasTireoide(e.target.checked)}
+                            className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-text-secondary">Problemas de tireoide ou alteração hormonal recente?</span>
+                        </label>
+                      </div>
+
+                      <div className="space-y-3">
+                        {/* Quimioterapia recente */}
+                        <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                          <input 
+                            type="checkbox"
+                            checked={quimioterapiaRecente}
+                            onChange={(e) => setQuimioterapiaRecente(e.target.checked)}
+                            className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-text-secondary">Passou por quimioterapia nos últimos 6 meses?</span>
+                        </label>
+
+                        {/* Queda de cabelo / alopecia */}
+                        <label className="flex items-center gap-3 p-2.5 bg-bg/25 rounded-lg border border-border/40 cursor-pointer select-none w-full transition-colors hover:bg-bg/40">
+                          <input 
+                            type="checkbox"
+                            checked={quedaCabeloAlopecia}
+                            onChange={(e) => setQuedaCabeloAlopecia(e.target.checked)}
+                            className="w-4.5 h-4.5 accent-rose-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-text-secondary">Queda acentuada de cabelo ou diagnóstico de alopecia?</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Doenças Crônicas</label>
-                    <input 
-                      type="text" 
-                      placeholder="Ex: Diabetes, hipertensão..."
-                      value={doencasCronicas}
-                      onChange={(e) => setDoencasCronicas(e.target.value)}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400"
-                    />
-                  </div>
-                </div>
+                  {/* CARD 4: Alergias & Detalhes Clínicos */}
+                  <div className="bg-bg/10 border border-border/80 rounded-xl p-5 space-y-4 md:col-span-2 shadow-sm">
+                    <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                      <ShieldAlert className="w-4 h-4 text-rose-500" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">Alergias & Detalhes Clínicos</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Alergias conhecidas</label>
+                        <input 
+                          type="text" 
+                          placeholder="Ex: Esmalte, cosméticos, cianoacrilato (cola), fita micropore, látex..."
+                          value={alergias}
+                          onChange={(e) => setAlergias(e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 placeholder:text-text-muted"
+                        />
+                      </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Observações Livres</label>
-                  <textarea 
-                    rows={4}
-                    placeholder="Histórico clínico geral, preferências de atendimento, anotações de sessões anteriores..."
-                    value={observacoes}
-                    onChange={(e) => setObservacoes(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 placeholder:text-text-muted"
-                  />
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Medicamentos em uso</label>
+                        <input 
+                          type="text" 
+                          placeholder="Ex: Roacutan, colírios frequentes, corticoides..."
+                          value={medicamentos}
+                          onChange={(e) => setMedicamentos(e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 placeholder:text-text-muted"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Doenças Crônicas</label>
+                        <input 
+                          type="text" 
+                          placeholder="Ex: Diabetes, labirintite (dificulta ficar deitada muito tempo), asma..."
+                          value={doencasCronicas}
+                          onChange={(e) => setDoencasCronicas(e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 placeholder:text-text-muted"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Observações de Design & Mapping</label>
+                        <textarea 
+                          rows={3}
+                          placeholder="Anotações gerais, técnica preferida, mapping (ex: gatinho, boneca), curvaturas (C, D, L), espessuras (0.07, 0.15) e notas de atendimentos..."
+                          value={observacoes}
+                          onChange={(e) => setObservacoes(e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 placeholder:text-text-muted"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="pt-3 border-t border-border flex justify-end">

@@ -27,3 +27,243 @@ body {
   padding: 0;
   min-height: 100vh;
 }
+
+/* ==========================================================================
+   DARK MODE OVERRIDES (Aplica-se quando a classe .dark está no <html> ou <body>)
+   ========================================================================== */
+
+/* Overrides de fundos e containers */
+.dark .bg-white {
+  background-color: var(--surface) !important;
+}
+
+.dark .bg-bg\/15 {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark .bg-gray-50,
+.dark .bg-rose-50\/10,
+.dark .bg-rose-50\/20 {
+  background-color: var(--rose-50) !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: var(--rose-100) !important;
+}
+
+.dark .bg-rose-50,
+.dark .bg-rose-100 {
+  background-color: var(--rose-100) !important;
+  color: var(--rose-800) !important;
+}
+
+/* Overrides de textos */
+.dark .text-text-primary,
+.dark .text-gray-900 {
+  color: var(--text-primary) !important;
+}
+
+.dark .text-text-secondary,
+.dark .text-gray-700,
+.dark .text-gray-600,
+.dark .text-gray-500 {
+  color: var(--text-secondary) !important;
+}
+
+.dark .text-text-muted,
+.dark .text-gray-400 {
+  color: var(--text-muted) !important;
+}
+
+/* Overrides de bordas e divisores */
+.dark .border,
+.dark .border-border,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .divide-border > * + * {
+  border-color: var(--border) !important;
+}
+
+.dark hr {
+  border-color: var(--border) !important;
+}
+
+/* Inputs, Textareas e Selects */
+.dark input, 
+.dark select, 
+.dark textarea {
+  background-color: var(--bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+.dark input::placeholder, 
+.dark textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+.dark input:disabled, 
+.dark textarea:disabled, 
+.dark select:disabled {
+  background-color: var(--rose-50) !important;
+  color: var(--text-muted) !important;
+  opacity: 0.7;
+}
+
+/* Modal and Overlays */
+.dark .bg-black\/45 {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Custom list items timeline */
+.dark .border-rose-100 {
+  border-color: var(--rose-200) !important;
+}
+
+/* ==========================================================================
+   AGENDAMENTOS & CALENDÁRIO CONTRASTE (MODO ESCURO)
+   ========================================================================== */
+
+/* 1. Confirmados (Rose / Custom Palette) */
+.dark .bg-rose-50\/95,
+.dark .bg-rose-50\/90,
+.dark .bg-rose-50 {
+  background-color: var(--rose-100) !important;
+  color: var(--rose-800) !important;
+  opacity: 1 !important;
+}
+.dark .border-rose-300 {
+  border-color: var(--rose-200) !important;
+}
+.dark .hover\:bg-rose-100:hover {
+  background-color: var(--rose-200) !important;
+}
+
+/* 2. Pendentes (Amber) */
+.dark .bg-amber-50\/95,
+.dark .bg-amber-50\/90,
+.dark .bg-amber-50 {
+  background-color: #2F210F !important;
+  border-color: #5E3D16 !important;
+  opacity: 1 !important;
+}
+.dark .hover\:bg-amber-100:hover {
+  background-color: #453016 !important;
+}
+.dark .bg-amber-50\/95 *,
+.dark .bg-amber-50\/90 *,
+.dark .bg-amber-50 * {
+  color: #FCD34D !important;
+}
+
+/* 3. Concluídos (Emerald) */
+.dark .bg-emerald-50\/95,
+.dark .bg-emerald-50\/90,
+.dark .bg-emerald-50 {
+  background-color: #0C231E !important;
+  border-color: #144035 !important;
+  opacity: 1 !important;
+}
+.dark .hover\:bg-emerald-100\/90:hover {
+  background-color: #14352D !important;
+}
+.dark .bg-emerald-50\/95 *,
+.dark .bg-emerald-50\/90 *,
+.dark .bg-emerald-50 * {
+  color: #34D399 !important;
+}
+
+/* 4. Cancelados (Gray) */
+.dark .bg-gray-100\/50,
+.dark .bg-gray-200\/50,
+.dark .bg-gray-100,
+.dark .bg-gray-200 {
+  background-color: #241D1E !important;
+  border-color: #373132 !important;
+  opacity: 1 !important;
+}
+.dark .hover\:bg-gray-200\/50:hover {
+  background-color: #2D2526 !important;
+}
+.dark .bg-gray-100\/50 *,
+.dark .bg-gray-200\/50 *,
+.dark .bg-gray-100 *,
+.dark .bg-gray-200 * {
+  color: var(--text-muted) !important;
+}
+
+/* Evita transparência em blocos absolutos do calendário */
+.dark .absolute.rounded-lg.border {
+  opacity: 1 !important;
+}
+.dark .absolute.rounded-lg.border.bg-gray-100\/50 {
+  background-color: #241D1E !important;
+}
+
+/* Horários indisponíveis na grade de fundo */
+.dark .bg-gray-100\/55 {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Badges e Origem (Portal / Manual) */
+.dark .bg-rose-200, 
+.dark .bg-amber-200, 
+.dark .bg-emerald-200, 
+.dark .bg-gray-200 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: var(--text-primary) !important;
+}
+.dark .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  color: #93C5FD !important;
+}
+.dark .text-blue-700 {
+  color: #93C5FD !important;
+}
+.dark .text-rose-800,
+.dark .text-rose-900 {
+  color: var(--rose-800) !important;
+}
+.dark .text-amber-800,
+.dark .text-amber-900 {
+  color: #FCD34D !important;
+}
+.dark .text-emerald-800,
+.dark .text-emerald-900 {
+  color: #34D399 !important;
+}
+.dark .text-gray-400,
+.dark .text-gray-500,
+.dark .text-gray-600 {
+  color: var(--text-muted) !important;
+}
+
+/* Status Badges no Portal */
+.dark .bg-amber-50 {
+  background-color: #2F210F !important;
+}
+.dark .border-amber-200\/60 {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.dark .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+}
+.dark .border-blue-200\/60 {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.dark .bg-green-50 {
+  background-color: #0C231E !important;
+}
+.dark .border-green-200\/60 {
+  border-color: rgba(52, 211, 153, 0.3) !important;
+}
+
+/* Dias de outro mês no calendário mensal (vagos) no modo escuro */
+.dark .bg-gray-50\/40 {
+  background-color: var(--bg) !important;
+  opacity: 0.45 !important;
+}
+
+

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { PALETTES_LIST, applyPalette } from '../utils/theme';
 import {
   Camera,
   Trash2,
@@ -19,6 +20,7 @@ import {
   CalendarClock,
   MessageSquare,
   Timer,
+  Palette,
 } from 'lucide-react';
 
 export default function Configuracoes() {
@@ -52,6 +54,8 @@ export default function Configuracoes() {
   const [aprovacaoAutomatica, setAprovacaoAutomatica] = useState(false);
   const [antecedenciaHoras, setAntecedenciaHoras] = useState(24);
   const [mensagemPosAgendamento, setMensagemPosAgendamento] = useState('');
+  const [paletaCores, setPaletaCores] = useState('rosa_rose');
+  const [modoEscuro, setModoEscuro] = useState(false);
   const [loadingNegocio, setLoadingNegocio] = useState(true);
   const [savingNegocio, setSavingNegocio] = useState(false);
   const [negocioError, setNegocioError] = useState<string | null>(null);
@@ -85,6 +89,8 @@ export default function Configuracoes() {
         setAprovacaoAutomatica(data.aprovacao_automatica ?? false);
         setAntecedenciaHoras(data.antecedencia_cancelamento_horas ?? 24);
         setMensagemPosAgendamento(data.mensagem_pos_agendamento || '');
+        setPaletaCores(data.paleta_cores || 'rosa_rose');
+        setModoEscuro(!!data.modo_escuro);
       }
       setLoadingNegocio(false);
     }
@@ -279,6 +285,8 @@ export default function Configuracoes() {
           aprovacao_automatica: aprovacaoAutomatica,
           antecedencia_cancelamento_horas: antecedenciaHoras,
           mensagem_pos_agendamento: mensagemPosAgendamento.trim(),
+          paleta_cores: paletaCores,
+          modo_escuro: modoEscuro,
         })
         .eq('id', configuracaoId);
 
@@ -674,6 +682,108 @@ export default function Configuracoes() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Section 3.5: Identidade Visual e Cores */}
+      <div className="bg-white border border-border rounded-[14px] p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+          <h3 className="font-title font-bold text-lg text-text-primary flex items-center gap-2">
+            <Palette className="w-5 h-5 text-rose-600" />
+            Identidade Visual e Cores
+          </h3>
+
+          {/* Switch Modo Escuro */}
+          <div className="flex items-center gap-3 bg-bg/40 p-2 rounded-lg border border-border/50">
+            <span className="text-xs font-semibold text-text-primary uppercase tracking-wider">Modo Escuro (Dark Mode)</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={modoEscuro}
+              onClick={() => {
+                const newMode = !modoEscuro;
+                setModoEscuro(newMode);
+                applyPalette(paletaCores, newMode); // Instant reflection!
+              }}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2 ${
+                modoEscuro ? 'bg-rose-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                  modoEscuro ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+        
+        <p className="text-xs text-text-secondary mt-2">
+          Selecione a paleta de cores geral do sistema. A alteração é refletida em tempo real tanto no seu painel administrativo quanto no portal da cliente.
+        </p>
+
+        {loadingNegocio ? (
+          <p className="text-sm text-text-secondary mt-4">Carregando...</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+            {PALETTES_LIST.map((palette) => {
+              const isSelected = paletaCores === palette.id;
+              return (
+                <button
+                  key={palette.id}
+                  type="button"
+                  onClick={() => {
+                    setPaletaCores(palette.id);
+                    applyPalette(palette.id, modoEscuro); // Aplicação instantânea!
+                  }}
+                  className={`
+                    flex flex-col text-left p-4 rounded-xl border transition-all cursor-pointer relative group
+                    ${isSelected 
+                      ? 'border-rose-600 bg-rose-50/5 ring-1 ring-rose-400' 
+                      : 'border-border bg-bg/5 hover:bg-bg/15 hover:border-text-muted'}
+                  `}
+                >
+                  {/* Nome da Paleta */}
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-sm font-semibold text-text-primary">{palette.name}</span>
+                    {isSelected && (
+                      <span className="w-2 h-2 rounded-full bg-rose-600" />
+                    )}
+                  </div>
+
+                  {/* Descrição */}
+                  <span className="text-[11px] text-text-secondary mt-1 leading-relaxed flex-grow">
+                    {palette.description}
+                  </span>
+
+                  {/* Pré-visualização das Cores */}
+                  <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/40 w-full">
+                    <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Cores:</span>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      {/* Cor Primária */}
+                      <span 
+                        className="w-5 h-5 rounded-full border border-black/5 shadow-sm block" 
+                        style={{ backgroundColor: palette.primaryColor }}
+                        title="Cor Principal"
+                      />
+                      {/* Cor Secundária */}
+                      <span 
+                        className="w-5 h-5 rounded-full border border-black/5 shadow-sm block" 
+                        style={{ backgroundColor: palette.accentColor }}
+                        title="Cor de Destaque"
+                      />
+                      {/* Cor de Fundo */}
+                      <span 
+                        className="w-5 h-5 rounded-full border border-black/5 shadow-sm block" 
+                        style={{ backgroundColor: palette.bgColor }}
+                        title="Fundo"
+                      />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

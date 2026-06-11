@@ -1,5 +1,8 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { supabase } from './lib/supabase';
+import { applyPalette } from './utils/theme';
 import ProfissionalRoute from './components/common/ProfissionalRoute';
 import ClienteRoute from './components/common/ClienteRoute';
 import Layout from './components/layout/Layout';
@@ -18,9 +21,33 @@ import PortalAgendar from './pages/portal/PortalAgendar';
 import PortalMeusAgendamentos from './pages/portal/PortalMeusAgendamentos';
 import PortalPerfil from './pages/portal/PortalPerfil';
 
-
-
 export default function App() {
+  useEffect(() => {
+    // 1. Aplica o tema salvo localmente de forma imediata (carregamento rápido)
+    const cachedPalette = localStorage.getItem('app_theme_palette') || 'rosa_rose';
+    const cachedDarkMode = localStorage.getItem('app_theme_dark_mode') === 'true';
+    applyPalette(cachedPalette, cachedDarkMode);
+
+    // 2. Consulta o banco para manter o tema atualizado
+    async function fetchTheme() {
+      try {
+        const { data, error } = await supabase
+          .from('configuracao_negocio')
+          .select('paleta_cores, modo_escuro')
+          .maybeSingle();
+        
+        if (!error && data) {
+          const dbPalette = data.paleta_cores || 'rosa_rose';
+          const dbDarkMode = !!data.modo_escuro;
+          applyPalette(dbPalette, dbDarkMode);
+        }
+      } catch (err) {
+        console.error('Erro ao sincronizar tema:', err);
+      }
+    }
+    fetchTheme();
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>

@@ -68,6 +68,21 @@ export interface Cliente {
   medicamentos?: string | null;
   doencas_cronicas?: string | null;
   gestante: boolean;
+  anamnese_lash?: {
+    fez_extensao_antes?: boolean;
+    reacao_alergica_anterior?: boolean;
+    usa_lentes_contato?: boolean;
+    olhos_sensiveis?: boolean;
+    doencas_oculares?: boolean;
+    habito_esfregar_olhos?: boolean;
+    posicao_dormir?: 'lado' | 'costas' | 'de_brucos' | 'variada' | '';
+    maquiagem_prova_agua?: boolean;
+    exposicao_calor_agua?: boolean;
+    problemas_tireoide?: boolean;
+    quimioterapia_recente?: boolean;
+    queda_cabelo_alopecia?: boolean;
+    alergia_produtos?: boolean;
+  } | null;
   // campos legados — não existem no novo schema
   ativo?: boolean;
   como_conheceu?: string | null;
@@ -122,6 +137,8 @@ export interface ConfiguracaoNegocio {
   aprovacao_automatica: boolean;
   antecedencia_cancelamento_horas: number;
   mensagem_pos_agendamento: string;
+  paleta_cores?: string | null;
+  modo_escuro?: boolean | null;
   created_at?: string;
 }
 
