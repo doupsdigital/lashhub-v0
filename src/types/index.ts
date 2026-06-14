@@ -5,6 +5,7 @@ export interface Usuario {
   avatar_url?: string | null;
   role: 'profissional' | 'cliente';
   cliente_id?: string | null;
+  estabelecimento_id?: string | null;
   created_at?: string;
 }
 

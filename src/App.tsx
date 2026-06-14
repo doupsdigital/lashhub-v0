@@ -15,7 +15,7 @@ import Servicos from './pages/Servicos';
 import Agendamentos from './pages/Agendamentos';
 import Configuracoes from './pages/Configuracoes';
 import MeusHorarios from './pages/MeusHorarios';
-import CadastroCliente from './pages/portal/CadastroCliente';
+import CadastroProfissional from './pages/CadastroProfissional';
 import PortalCatalogo from './pages/portal/PortalCatalogo';
 import PortalAgendar from './pages/portal/PortalAgendar';
 import PortalMeusAgendamentos from './pages/portal/PortalMeusAgendamentos';
@@ -55,7 +55,7 @@ export default function App() {
           {/* Públicas */}
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/cadastro" element={<CadastroCliente />} />
+          <Route path="/cadastro" element={<CadastroProfissional />} />
 
           {/* Rotas da profissional */}
           <Route

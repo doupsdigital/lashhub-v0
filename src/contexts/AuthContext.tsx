@@ -11,6 +11,8 @@ interface AuthContextType {
   isProfissional: boolean;
   isCliente: boolean;
   clienteId: string | null;
+  estabelecimentoId: string | null;
+  plano: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -22,6 +24,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Usuario | null>(null);
+  const [estabelecimentoId, setEstabelecimentoId] = useState<string | null>(null);
+  const [plano, setPlano] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!session?.user) {
         setUser(null);
         setProfile(null);
+        setEstabelecimentoId(null);
+        setPlano(null);
         setLoading(false);
         return;
       }
@@ -38,17 +44,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data } = await supabase
         .from('usuarios')
-        .select('*')
+        .select('*, estabelecimentos(plano)')
         .eq('id', session.user.id)
         .maybeSingle();
 
-      if (!data) {
+      const profileData = data as any;
+      if (!profileData) {
         // Usuário autenticado mas sem registro em usuarios → logout automático
         await supabase.auth.signOut();
         return;
       }
 
-      setProfile(data);
+      setProfile(profileData);
+      setEstabelecimentoId(profileData.estabelecimento_id ?? null);
+      setPlano(profileData.estabelecimentos?.plano ?? 'basico');
       setLoading(false);
     });
 
@@ -69,8 +78,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (!user) return;
-    const { data } = await supabase.from('usuarios').select('*').eq('id', user.id).maybeSingle();
-    if (data) setProfile(data);
+    const { data } = await supabase
+      .from('usuarios')
+      .select('*, estabelecimentos(plano)')
+      .eq('id', user.id)
+      .maybeSingle();
+    
+    const profileData = data as any;
+    if (profileData) {
+      setProfile(profileData);
+      setEstabelecimentoId(profileData.estabelecimento_id ?? null);
+      setPlano(profileData.estabelecimentos?.plano ?? 'basico');
+    }
   };
 
   const role: 'profissional' | 'cliente' | null = profile?.role ?? null;
@@ -79,8 +98,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clienteId = profile?.cliente_id ?? null;
 
   return (
+    <AuthProviderHelper
+      user={user}
+      profile={profile}
+      role={role}
+      isProfissional={isProfissional}
+      isCliente={isCliente}
+      clienteId={clienteId}
+      estabelecimentoId={estabelecimentoId}
+      plano={plano}
+      loading={loading}
+      signIn={signIn}
+      signOut={signOut}
+      refreshProfile={refreshProfile}
+    >
+      {children}
+    </AuthProviderHelper>
+  );
+}
+
+// Pequeno helper para envelopar o Provider de forma organizada
+function AuthProviderHelper({
+  children,
+  user,
+  profile,
+  role,
+  isProfissional,
+  isCliente,
+  clienteId,
+  estabelecimentoId,
+  plano,
+  loading,
+  signIn,
+  signOut,
+  refreshProfile,
+}: {
+  children: ReactNode;
+  user: User | null;
+  profile: Usuario | null;
+  role: 'profissional' | 'cliente' | null;
+  isProfissional: boolean;
+  isCliente: boolean;
+  clienteId: string | null;
+  estabelecimentoId: string | null;
+  plano: string | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+}) {
+  return (
     <AuthContext.Provider value={{
       user, profile, role, isProfissional, isCliente, clienteId,
+      estabelecimentoId, plano,
       loading, signIn, signOut, refreshProfile,
     }}>
       {children}
