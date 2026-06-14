@@ -1,50 +1,16 @@
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { BookOpen, Calendar, ClipboardList, User, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-
-const navItems = [
-  { name: 'Catálogo', shortName: 'Catálogo', path: '/portal/catalogo', icon: BookOpen },
-  { name: 'Agendar', shortName: 'Agendar', path: '/portal/agendar', icon: Calendar },
-  { name: 'Meus Agendamentos', shortName: 'Agendamentos', path: '/portal/meus-agendamentos', icon: ClipboardList },
-  { name: 'Meu Perfil', shortName: 'Perfil', path: '/portal/perfil', icon: User },
-];
+import { usePortal } from '../../contexts/PortalContext';
 
 export default function PortalLayout() {
   const navigate = useNavigate();
-  const { profile, signOut } = useAuth();
-  const [businessName, setBusinessName] = useState('...');
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    supabase
-      .from('configuracao_negocio')
-      .select('nome_negocio, logo_url')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setBusinessName(data.nome_negocio || 'Studio');
-          setLogoUrl(data.logo_url || null);
-        }
-      });
-  }, []);
-
-  useEffect(() => {
-    const handleUpdate = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail) {
-        if (detail.nome_negocio !== undefined) setBusinessName(detail.nome_negocio);
-        if (detail.logo_url !== undefined) setLogoUrl(detail.logo_url);
-      }
-    };
-    window.addEventListener('business-config-updated', handleUpdate);
-    return () => window.removeEventListener('business-config-updated', handleUpdate);
-  }, []);
+  const { user, profile, signOut } = useAuth();
+  const { nomeNegocio, logoUrl, slug, loading } = usePortal();
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login', { replace: true });
+    navigate(slug ? `/portal/${slug}/login` : '/login', { replace: true });
   };
 
   const clientName = profile?.nome?.split(' ')[0] || 'Cliente';
@@ -55,45 +21,80 @@ export default function PortalLayout() {
     .substring(0, 2)
     .toUpperCase();
 
+  const navItems = [
+    { name: 'Catálogo', shortName: 'Catálogo', path: `/portal/${slug}/catalogo`, icon: BookOpen },
+    { name: 'Agendar', shortName: 'Agendar', path: `/portal/${slug}/agendar`, icon: Calendar },
+    { name: 'Meus Agendamentos', shortName: 'Agendamentos', path: `/portal/${slug}/meus-agendamentos`, icon: ClipboardList },
+    { name: 'Meu Perfil', shortName: 'Perfil', path: `/portal/${slug}/perfil`, icon: User },
+  ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <div className="w-16 h-16 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-title font-semibold text-3xl shadow-md">
+            S
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-bounce [animation-delay:-0.3s]"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-bounce [animation-delay:-0.15s]"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-bounce"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-bg flex flex-col font-sans">
       {/* Header */}
       <header className="h-[60px] bg-white border-b border-border flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
         <div className="flex items-center gap-2.5 min-w-0">
           {logoUrl ? (
-            <img src={logoUrl} alt={businessName} className="h-8 w-auto object-contain flex-shrink-0" />
+            <img src={logoUrl} alt={nomeNegocio || 'Studio'} className="h-8 w-auto object-contain flex-shrink-0" />
           ) : (
             <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-title font-semibold text-lg flex-shrink-0">
-              {businessName !== '...' ? businessName[0].toUpperCase() : 'S'}
+              {nomeNegocio ? nomeNegocio[0].toUpperCase() : 'S'}
             </div>
           )}
           <span className="font-title font-semibold text-xl text-text-primary tracking-wide truncate">
-            {businessName}
+            {nomeNegocio}
           </span>
         </div>
 
         <div className="flex items-center gap-3">
-          {profile?.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={clientName}
-              className="w-9 h-9 rounded-full object-cover border border-rose-200 flex-shrink-0"
-            />
+          {user ? (
+            <>
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={clientName}
+                  className="w-9 h-9 rounded-full object-cover border border-rose-200 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-rose-200 text-rose-800 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                  {initials}
+                </div>
+              )}
+              <span className="text-sm text-text-secondary hidden sm:block">
+                Olá, <span className="font-semibold text-text-primary">{clientName}</span>
+              </span>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-text-secondary hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:block">Sair</span>
+              </button>
+            </>
           ) : (
-            <div className="w-9 h-9 rounded-full bg-rose-200 text-rose-800 flex items-center justify-center font-semibold text-sm flex-shrink-0">
-              {initials}
-            </div>
+            <Link
+              to={`/portal/${slug}/login`}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-800 rounded-xl transition-all shadow-md cursor-pointer"
+            >
+              Entrar
+            </Link>
           )}
-          <span className="text-sm text-text-secondary hidden sm:block">
-            Olá, <span className="font-semibold text-text-primary">{clientName}</span>
-          </span>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-text-secondary hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:block">Sair</span>
-          </button>
         </div>
       </header>
 

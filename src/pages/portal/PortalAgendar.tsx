@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import type { CategoriaServico, Servico, VariacaoServico, HorarioAtendimento, BloqueioAgenda } from '../../types';
+import { usePortal } from '../../contexts/PortalContext';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ export default function PortalAgendar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { clienteId } = useAuth();
+  const { establishmentId, slug } = usePortal();
 
   // Capture the query param only once at mount
   const preSelectedId = useRef(searchParams.get('servico')).current;
@@ -211,12 +213,22 @@ export default function PortalAgendar() {
 
   // Step 1: services + pre-selection
   useEffect(() => {
+    if (!establishmentId) return;
     (async () => {
       setLoadingServicos(true);
       try {
         const [catRes, servRes, varRes] = await Promise.all([
-          supabase.from('categorias_servico').select('*').order('ordem', { ascending: true }),
-          supabase.from('servicos').select('*').eq('ativo', true).order('nome', { ascending: true }),
+          supabase
+            .from('categorias_servico')
+            .select('*')
+            .eq('estabelecimento_id', establishmentId)
+            .order('ordem', { ascending: true }),
+          supabase
+            .from('servicos')
+            .select('*')
+            .eq('estabelecimento_id', establishmentId)
+            .eq('ativo', true)
+            .order('nome', { ascending: true }),
           supabase.from('variacoes_servico').select('*'),
         ]);
 
@@ -251,18 +263,18 @@ export default function PortalAgendar() {
         setLoadingServicos(false);
       }
     })();
-  }, []);
+  }, [establishmentId]);
 
   // Step 2: calendar data (loaded once on first entry)
   useEffect(() => {
-    if (etapa !== 2 || calendarioCarregado) return;
+    if (etapa !== 2 || calendarioCarregado || !establishmentId) return;
 
     (async () => {
       setLoadingCalendario(true);
       try {
         const [horRes, bloqRes] = await Promise.all([
-          supabase.from('horarios_atendimento').select('*'),
-          supabase.from('bloqueios_agenda').select('*'),
+          supabase.from('horarios_atendimento').select('*').eq('estabelecimento_id', establishmentId),
+          supabase.from('bloqueios_agenda').select('*').eq('estabelecimento_id', establishmentId),
         ]);
         setHorarios(horRes.data || []);
         setBloqueios(bloqRes.data || []);
@@ -271,11 +283,11 @@ export default function PortalAgendar() {
         setLoadingCalendario(false);
       }
     })();
-  }, [etapa, calendarioCarregado]);
+  }, [etapa, calendarioCarregado, establishmentId]);
 
   // Step 3: compute available slots
   useEffect(() => {
-    if (etapa !== 3 || !dataSelecionada || horarios.length === 0) return;
+    if (etapa !== 3 || !dataSelecionada || horarios.length === 0 || !establishmentId) return;
 
     (async () => {
       setLoadingSlots(true);
@@ -290,6 +302,7 @@ export default function PortalAgendar() {
         const { data: agData } = await supabase
           .from('agendamentos')
           .select('data_hora, duracao_minutos')
+          .eq('estabelecimento_id', establishmentId)
           .gte('data_hora', `${dataSelecionada}T00:00:00Z`)
           .lte('data_hora', `${dataSelecionada}T23:59:59Z`)
           .in('status', ['pendente', 'confirmado']);
@@ -299,7 +312,7 @@ export default function PortalAgendar() {
         setLoadingSlots(false);
       }
     })();
-  }, [etapa, dataSelecionada, horarios, duracaoTotal]);
+  }, [etapa, dataSelecionada, horarios, duracaoTotal, establishmentId]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -340,6 +353,7 @@ export default function PortalAgendar() {
       const { data: config } = await supabase
         .from('configuracao_negocio')
         .select('aprovacao_automatica, mensagem_pos_agendamento')
+        .eq('estabelecimento_id', establishmentId)
         .maybeSingle();
 
       const aprovAuto = config?.aprovacao_automatica ?? false;
@@ -354,6 +368,7 @@ export default function PortalAgendar() {
         const { data: agRecentes } = await supabase
           .from('agendamentos')
           .select('data_hora, duracao_minutos')
+          .eq('estabelecimento_id', establishmentId)
           .gte('data_hora', `${dataSelecionada}T00:00:00Z`)
           .lte('data_hora', `${dataSelecionada}T23:59:59Z`)
           .in('status', ['pendente', 'confirmado']);
@@ -385,6 +400,7 @@ export default function PortalAgendar() {
         .insert({
           id: agendamentoId,
           cliente_id: clienteId,
+          estabelecimento_id: establishmentId,
           data_hora: dataHoraISO,
           duracao_minutos: duracaoTotal,
           status: aprovAuto ? 'confirmado' : 'pendente',
@@ -446,13 +462,13 @@ export default function PortalAgendar() {
         </div>
         <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
           <button
-            onClick={() => navigate('/portal/meus-agendamentos')}
+            onClick={() => navigate(`/portal/${slug}/meus-agendamentos`)}
             className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-800 text-white rounded-xl text-sm font-semibold transition-colors cursor-pointer"
           >
             Ver meus agendamentos
           </button>
           <button
-            onClick={() => navigate('/portal/catalogo')}
+            onClick={() => navigate(`/portal/${slug}/catalogo`)}
             className="flex-1 py-2.5 border border-border text-text-secondary hover:bg-bg rounded-xl text-sm font-semibold transition-colors cursor-pointer"
           >
             Voltar ao catálogo

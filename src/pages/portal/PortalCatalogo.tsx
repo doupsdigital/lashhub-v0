@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Clock, Tag, Calendar, AlertCircle, Sparkles, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { CategoriaServico, Servico, VariacaoServico } from '../../types';
+import { usePortal } from '../../contexts/PortalContext';
 
 interface ServicoComVariacoes extends Servico {
   variacoes: VariacaoServico[];
@@ -98,18 +99,29 @@ function ServicoCard({ servico, onAgendar }: ServicoCardProps) {
 
 export default function PortalCatalogo() {
   const navigate = useNavigate();
+  const { establishmentId, slug } = usePortal();
   const [categorias, setCategorias] = useState<CategoriaComServicos[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [categoriaAtiva, setCategoriaAtiva] = useState<string>('todas');
 
   const fetchData = async () => {
+    if (!establishmentId) return;
     setLoading(true);
     setError(false);
     try {
       const [catResult, servResult, varResult] = await Promise.all([
-        supabase.from('categorias_servico').select('*').order('ordem', { ascending: true }),
-        supabase.from('servicos').select('*').eq('ativo', true).order('nome', { ascending: true }),
+        supabase
+          .from('categorias_servico')
+          .select('*')
+          .eq('estabelecimento_id', establishmentId)
+          .order('ordem', { ascending: true }),
+        supabase
+          .from('servicos')
+          .select('*')
+          .eq('estabelecimento_id', establishmentId)
+          .eq('ativo', true)
+          .order('nome', { ascending: true }),
         supabase.from('variacoes_servico').select('*'),
       ]);
 
@@ -142,7 +154,7 @@ export default function PortalCatalogo() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [establishmentId]);
 
   const categoriasExibidas =
     categoriaAtiva === 'todas'
@@ -239,7 +251,7 @@ export default function PortalCatalogo() {
                 <ServicoCard
                   key={serv.id}
                   servico={serv}
-                  onAgendar={() => navigate(`/portal/agendar?servico=${serv.id}`)}
+                  onAgendar={() => navigate(`/portal/${slug}/agendar?servico=${serv.id}`)}
                 />
               ))}
             </div>

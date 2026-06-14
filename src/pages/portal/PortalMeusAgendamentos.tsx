@@ -4,6 +4,7 @@ import { Calendar, Clock, Tag, AlertCircle, Loader2, ClipboardList, Info } from 
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { usePortal } from '../../contexts/PortalContext';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ function getStatusBadgeClass(status: string): string {
 export default function PortalMeusAgendamentos() {
   const navigate = useNavigate();
   const { clienteId } = useAuth();
+  const { establishmentId, slug } = usePortal();
 
   const [agendamentos, setAgendamentos] = useState<AgendamentoWithServices[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +99,7 @@ export default function PortalMeusAgendamentos() {
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
 
   const fetchAgendamentos = async () => {
-    if (!clienteId) return;
+    if (!clienteId || !establishmentId) return;
     setLoading(true);
     setError(false);
     try {
@@ -112,6 +114,7 @@ export default function PortalMeusAgendamentos() {
           )
         `)
         .eq('cliente_id', clienteId)
+        .eq('estabelecimento_id', establishmentId)
         .order('data_hora', { ascending: false });
 
       if (fetchErr) throw fetchErr;
@@ -127,17 +130,19 @@ export default function PortalMeusAgendamentos() {
   useEffect(() => {
     fetchAgendamentos();
 
-    // Buscar antecedencia_cancelamento_horas da configuracao
-    supabase
-      .from('configuracao_negocio')
-      .select('antecedencia_cancelamento_horas')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data && data.antecedencia_cancelamento_horas != null) {
-          setAntecedenciaMinima(data.antecedencia_cancelamento_horas);
-        }
-      });
-  }, [clienteId]);
+    if (establishmentId) {
+      supabase
+        .from('configuracao_negocio')
+        .select('antecedencia_cancelamento_horas')
+        .eq('estabelecimento_id', establishmentId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data && data.antecedencia_cancelamento_horas != null) {
+            setAntecedenciaMinima(data.antecedencia_cancelamento_horas);
+          }
+        });
+    }
+  }, [clienteId, establishmentId]);
 
   // Dividir os agendamentos em Próximos e Passados com base no horário atual do navegador
   // Recalcula "agora" sempre que os agendamentos são recarregados
@@ -267,7 +272,7 @@ export default function PortalMeusAgendamentos() {
               <p className="text-sm text-text-secondary">Que tal agendar um horário agora?</p>
             </div>
             <button
-              onClick={() => navigate('/portal/agendar')}
+              onClick={() => navigate(`/portal/${slug}/agendar`)}
               className="px-5 py-2.5 bg-rose-600 hover:bg-rose-800 text-white rounded-xl text-sm font-semibold transition-colors cursor-pointer inline-flex items-center gap-2"
             >
               <Calendar className="w-4 h-4" />

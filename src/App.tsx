@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { supabase } from './lib/supabase';
 import { applyPalette } from './utils/theme';
@@ -20,6 +20,9 @@ import PortalCatalogo from './pages/portal/PortalCatalogo';
 import PortalAgendar from './pages/portal/PortalAgendar';
 import PortalMeusAgendamentos from './pages/portal/PortalMeusAgendamentos';
 import PortalPerfil from './pages/portal/PortalPerfil';
+import CadastroCliente from './pages/portal/CadastroCliente';
+import PortalLogin from './pages/portal/PortalLogin';
+import { PortalProvider } from './contexts/PortalContext';
 
 export default function App() {
   useEffect(() => {
@@ -77,19 +80,30 @@ export default function App() {
 
           {/* Portal da cliente */}
           <Route
-            path="/portal"
+            path="/portal/:slug"
             element={
-              <ClienteRoute>
+              <PortalProvider>
                 <PortalLayout />
-              </ClienteRoute>
+              </PortalProvider>
             }
           >
             <Route index element={<Navigate to="catalogo" replace />} />
             <Route path="catalogo" element={<PortalCatalogo />} />
-            <Route path="agendar" element={<PortalAgendar />} />
-            <Route path="meus-agendamentos" element={<PortalMeusAgendamentos />} />
-            <Route path="perfil" element={<PortalPerfil />} />
+            <Route path="login" element={<PortalLogin />} />
+            <Route path="cadastro" element={<CadastroCliente />} />
 
+            {/* Rotas protegidas do cliente */}
+            <Route
+              element={
+                <ClienteRoute>
+                  <Outlet />
+                </ClienteRoute>
+              }
+            >
+              <Route path="agendar" element={<PortalAgendar />} />
+              <Route path="meus-agendamentos" element={<PortalMeusAgendamentos />} />
+              <Route path="perfil" element={<PortalPerfil />} />
+            </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

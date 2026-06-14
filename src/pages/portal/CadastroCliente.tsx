@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { usePortal } from '../../contexts/PortalContext';
 
 function applyPhoneMask(value: string): string {
   const digits = value.replace(/\D/g, '').substring(0, 11);
@@ -12,7 +13,7 @@ function applyPhoneMask(value: string): string {
 
 export default function CadastroCliente() {
   const navigate = useNavigate();
-  const [businessName, setBusinessName] = useState('Studio');
+  const { establishmentId, nomeNegocio, slug } = usePortal();
   const [form, setForm] = useState({
     nome: '',
     sobrenome: '',
@@ -26,16 +27,6 @@ export default function CadastroCliente() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    supabase
-      .from('configuracao_negocio')
-      .select('nome_negocio')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.nome_negocio) setBusinessName(data.nome_negocio);
-      });
-  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -70,10 +61,41 @@ export default function CadastroCliente() {
     setSubmitting(true);
 
     try {
-      // Passo 1 — Criar usuário no Supabase Auth
-      const { data, error: authError } = await supabase.auth.signUp({
+      if (!establishmentId) {
+        throw new Error('Estabelecimento não carregado.');
+      }
+
+      // Passo 1 — Gerar o ID do cliente no frontend para evitar a necessidade de SELECT (restrição RLS)
+      const clientId = crypto.randomUUID();
+
+      const { error: clientError } = await supabase
+        .from('clientes')
+        .insert({
+          id: clientId,
+          nome: form.nome.trim(),
+          sobrenome: form.sobrenome.trim(),
+          email: form.email.trim().toLowerCase(),
+          whatsapp: form.whatsapp,
+          estabelecimento_id: establishmentId
+        });
+
+      if (clientError) {
+        console.error('[cadastro] client insert error:', clientError);
+        throw new Error(`Erro ao registrar dados do cliente: ${clientError.message}`);
+      }
+
+      // Passo 2 — Criar usuário no Supabase Auth com metadados para a trigger
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email.trim().toLowerCase(),
         password: form.senha,
+        options: {
+          data: {
+            nome: `${form.nome.trim()} ${form.sobrenome.trim()}`,
+            role: 'cliente',
+            cliente_id: clientId,
+            estabelecimento_id: establishmentId
+          }
+        }
       });
 
       if (authError) {
@@ -88,33 +110,16 @@ export default function CadastroCliente() {
         throw new Error('Ocorreu um erro ao criar sua conta. Tente novamente.');
       }
 
-      if (!data.user) throw new Error('Ocorreu um erro ao criar sua conta. Tente novamente.');
+      if (!authData.user) throw new Error('Ocorreu um erro ao criar sua conta. Tente novamente.');
 
-      // Passos 2 e 3 via RPC (SECURITY DEFINER) — imune ao RLS e à condição de corrida do AuthContext
-      const { error: rpcError } = await supabase.rpc('cadastrar_cliente_portal', {
-        p_user_id:   data.user.id,
-        p_nome:      form.nome.trim(),
-        p_sobrenome: form.sobrenome.trim(),
-        p_email:     form.email.trim().toLowerCase(),
-        p_whatsapp:  form.whatsapp,
-      });
-
-      if (rpcError) {
-        console.error('[cadastro] rpc error:', rpcError.message, rpcError.details);
-        if (rpcError.message.includes('already registered')) {
-          throw new Error('Este e-mail já está cadastrado.');
-        }
-        throw new Error('Ocorreu um erro ao criar sua conta. Tente novamente.');
-      }
-
-      // Faz login automático — neste ponto usuarios já existe, AuthContext não vai encerrar a sessão
+      // Faz login automático
       await supabase.auth.signInWithPassword({
         email: form.email.trim().toLowerCase(),
         password: form.senha,
       });
 
       setSuccess(true);
-      setTimeout(() => navigate('/portal', { replace: true }), 1500);
+      setTimeout(() => navigate(`/portal/${slug}/catalogo`, { replace: true }), 1500);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Ocorreu um erro ao criar sua conta. Tente novamente.');
       setSubmitting(false);
@@ -132,10 +137,10 @@ export default function CadastroCliente() {
       <div className="w-full max-w-[460px] bg-white border border-border rounded-[20px] shadow-xl p-8 md:p-10 relative z-10 animate-fade-in">
         <div className="flex flex-col items-center text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-title font-semibold text-3xl shadow-md mb-4 hover:scale-105 transition-transform duration-300">
-            {businessName[0]?.toUpperCase() || 'S'}
+            {nomeNegocio ? nomeNegocio[0]?.toUpperCase() : 'S'}
           </div>
           <h2 className="font-title font-bold text-3xl text-text-primary tracking-wide">
-            {businessName}
+            {nomeNegocio}
           </h2>
           <p className="text-xs text-text-secondary mt-1 uppercase tracking-widest font-medium">
             Criar sua conta
@@ -287,7 +292,7 @@ export default function CadastroCliente() {
 
         <p className="text-center text-xs text-text-secondary mt-6">
           Já tem conta?{' '}
-          <Link to="/login" className="text-rose-600 font-semibold hover:underline">
+          <Link to={`/portal/${slug}/login`} className="text-rose-600 font-semibold hover:underline">
             Faça login
           </Link>
         </p>

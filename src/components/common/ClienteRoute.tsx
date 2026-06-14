@@ -1,8 +1,9 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function ClienteRoute({ children }: { children: React.ReactNode }) {
   const { user, isCliente, loading } = useAuth();
+  const { slug } = useParams<{ slug: string }>();
 
   if (loading) {
     return (
@@ -21,7 +22,7 @@ export default function ClienteRoute({ children }: { children: React.ReactNode }
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to={slug ? `/portal/${slug}/login` : '/login'} replace />;
   if (!isCliente) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
