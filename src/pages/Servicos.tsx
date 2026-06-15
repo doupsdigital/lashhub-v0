@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Plus, 
   Edit2, 
@@ -36,6 +37,7 @@ interface CategoriaWithRelations extends CategoriaServico {
 }
 
 export default function Servicos() {
+  const { estabelecimentoId } = useAuth();
   const [categorias, setCategorias] = useState<CategoriaWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -154,7 +156,10 @@ export default function Servicos() {
         // Create Categoria
         const { data, error } = await supabase
           .from('categorias_servico')
-          .insert({ nome: categoriaNome })
+          .insert({ 
+            nome: categoriaNome,
+            estabelecimento_id: estabelecimentoId
+          })
           .select()
           .single();
 
@@ -274,7 +279,8 @@ export default function Servicos() {
             nome: servicoNome,
             categoria_id: servicoCategoriaId,
             duracao_minutos: servicoDuracao,
-            valor: servicoValor
+            valor: servicoValor,
+            estabelecimento_id: estabelecimentoId
           })
           .select()
           .single();
