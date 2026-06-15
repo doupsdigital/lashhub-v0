@@ -10,7 +10,8 @@ import {
   UserPlus, 
   ChevronLeft, 
   ChevronRight,
-  Filter
+  Filter,
+  Trash2
 } from 'lucide-react';
 import type { Cliente } from '../types';
 import { registrarLog } from '../utils/log';
@@ -62,6 +63,8 @@ export default function Clientes() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form States
   const [nome, setNome] = useState('');
@@ -224,6 +227,39 @@ export default function Clientes() {
     } catch (err) {
       console.error(err);
       showTemporaryError('Falha ao salvar o cliente.');
+    }
+  };
+
+  const handleDeleteClient = async () => {
+    if (!clientToDelete) return;
+    setIsDeleting(true);
+
+    try {
+      // 1. Delete associated attendances
+      await supabase.from('atendimentos').delete().eq('cliente_id', clientToDelete.id);
+      
+      // 2. Delete associated appointments
+      await supabase.from('agendamentos').delete().eq('cliente_id', clientToDelete.id);
+      
+      // 3. Delete associated user if exists
+      await supabase.from('usuarios').delete().eq('cliente_id', clientToDelete.id);
+
+      // 4. Finally delete client
+      const { error } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('id', clientToDelete.id);
+
+      if (error) throw error;
+
+      await registrarLog('excluiu', 'cliente', clientToDelete.id, `Excluiu a cliente "${clientToDelete.name}"`);
+      setClientToDelete(null);
+      fetchData();
+    } catch (err: any) {
+      console.error('Erro ao excluir cliente:', err);
+      showTemporaryError(err.message || 'Falha ao excluir o cliente.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -415,6 +451,7 @@ export default function Clientes() {
                   <th className="px-6 py-4">Último Atendimento</th>
                   <th className="px-6 py-4">Origem</th>
                   <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -471,6 +508,16 @@ export default function Clientes() {
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider bg-green-100 text-green-800">
                           Ativo
                         </span>
+                      </td>
+                      {/* Actions */}
+                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setClientToDelete({ id: client.id, name: `${client.nome} ${client.sobrenome || ''}` })}
+                          className="p-1.5 text-text-secondary hover:text-red-600 rounded-lg hover:bg-red-50 transition-all cursor-pointer inline-flex items-center justify-center"
+                          title="Excluir Cliente"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -656,6 +703,47 @@ export default function Clientes() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {clientToDelete && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-[14px] border border-border shadow-xl w-full max-w-md flex flex-col p-6 animate-scale-in">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 border border-red-200 text-red-600 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <h4 className="font-title font-semibold text-lg text-text-primary">
+                  Confirmar Exclusão
+                </h4>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Tem certeza que deseja excluir permanentemente a cliente <span className="font-semibold text-text-primary">{clientToDelete.name}</span>? 
+                  Esta ação irá apagar definitivamente o cadastro e todo o seu histórico de atendimentos e agendamentos, e não poderá ser desfeita.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end gap-3 pt-5 mt-5 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setClientToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 border border-border rounded-lg text-xs font-medium text-text-secondary hover:bg-bg transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteClient}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                {isDeleting ? 'Excluindo...' : 'Confirmar Exclusão'}
+              </button>
+            </div>
           </div>
         </div>
       )}
