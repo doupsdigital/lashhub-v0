@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { Clock, CalendarOff, Plus, Trash2, AlertCircle, Sparkles } from 'lucide-react';
 import type { HorarioAtendimento, BloqueioAgenda } from '../types';
 import ConfirmModal from '../components/common/ConfirmModal';
@@ -30,6 +31,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function MeusHorarios() {
+  const { estabelecimentoId } = useAuth();
   const [dias, setDias] = useState<DiaConfig[]>(createDefaultDias);
   const [loadingHorarios, setLoadingHorarios] = useState(true);
   const [savingHorarios, setSavingHorarios] = useState(false);
@@ -50,20 +52,73 @@ export default function MeusHorarios() {
 
   useEffect(() => {
     async function loadHorarios() {
+      if (!estabelecimentoId) return;
       setLoadingHorarios(true);
       const { data, error } = await supabase
         .from('horarios_atendimento')
         .select('*')
+        .eq('estabelecimento_id', estabelecimentoId)
         .order('dia_semana');
 
       if (!error && data) {
+        const hasInitialized = localStorage.getItem(`horarios_inicializados_${estabelecimentoId}`) === 'true';
+        
+        if (!hasInitialized) {
+          const existingDays = (data as HorarioAtendimento[]).map(h => h.dia_semana);
+          const missingWeekdays = [1, 2, 3, 4, 5].filter(day => !existingDays.includes(day));
+          
+          if (missingWeekdays.length > 0) {
+            const defaults = missingWeekdays.map(day => ({
+              estabelecimento_id: estabelecimentoId,
+              dia_semana: day,
+              hora_inicio: '09:00',
+              hora_fim: '18:00'
+            }));
+            
+            const { error: seedError } = await supabase
+              .from('horarios_atendimento')
+              .insert(defaults);
+              
+            if (!seedError) {
+              localStorage.setItem(`horarios_inicializados_${estabelecimentoId}`, 'true');
+              // Reload
+              const { data: reloadedData, error: reloadError } = await supabase
+                .from('horarios_atendimento')
+                .select('*')
+                .eq('estabelecimento_id', estabelecimentoId)
+                .order('dia_semana');
+                
+              if (!reloadError && reloadedData) {
+                const newDias = createDefaultDias();
+                (reloadedData as HorarioAtendimento[]).forEach((h) => {
+                  if (h.dia_semana >= 0 && h.dia_semana <= 6) {
+                    newDias[h.dia_semana] = {
+                      ativo: true,
+                      hora_inicio: h.hora_inicio.substring(0, 5),
+                      hora_fim: h.hora_fim.substring(0, 5),
+                      existingId: h.id,
+                    };
+                  }
+                });
+                setDias(newDias);
+              }
+              setLoadingHorarios(false);
+              return;
+            } else {
+              console.error('Erro ao inicializar horários padrão:', seedError);
+            }
+          } else {
+            localStorage.setItem(`horarios_inicializados_${estabelecimentoId}`, 'true');
+          }
+        }
+
         const newDias = createDefaultDias();
         (data as HorarioAtendimento[]).forEach((h) => {
           if (h.dia_semana >= 0 && h.dia_semana <= 6) {
             newDias[h.dia_semana] = {
               ativo: true,
-              hora_inicio: h.hora_inicio,
-              hora_fim: h.hora_fim,
+              hora_inicio: h.hora_inicio.substring(0, 5),
+              hora_fim: h.hora_fim.substring(0, 5),
               existingId: h.id,
             };
           }
@@ -73,13 +128,15 @@ export default function MeusHorarios() {
       setLoadingHorarios(false);
     }
     loadHorarios();
-  }, []);
+  }, [estabelecimentoId]);
 
   async function loadBloqueios() {
+    if (!estabelecimentoId) return;
     setLoadingBloqueios(true);
     const { data, error } = await supabase
       .from('bloqueios_agenda')
       .select('*')
+      .eq('estabelecimento_id', estabelecimentoId)
       .order('data_inicio');
     if (!error && data) setBloqueios(data as BloqueioAgenda[]);
     setLoadingBloqueios(false);
@@ -87,7 +144,7 @@ export default function MeusHorarios() {
 
   useEffect(() => {
     loadBloqueios();
-  }, []);
+  }, [estabelecimentoId]);
 
   const handleDiaToggle = (index: number) => {
     setDias((prev) => prev.map((d, i) => (i === index ? { ...d, ativo: !d.ativo } : d)));
@@ -118,7 +175,12 @@ export default function MeusHorarios() {
           } else {
             const { data, error } = await supabase
               .from('horarios_atendimento')
-              .insert({ dia_semana: i, hora_inicio: dia.hora_inicio, hora_fim: dia.hora_fim })
+              .insert({ 
+                dia_semana: i, 
+                hora_inicio: dia.hora_inicio, 
+                hora_fim: dia.hora_fim,
+                estabelecimento_id: estabelecimentoId
+              })
               .select()
               .single();
             if (error) throw error;
@@ -166,6 +228,7 @@ export default function MeusHorarios() {
         data_inicio: novoDataInicio,
         data_fim: novoDataFim,
         motivo: novoMotivo.trim() || null,
+        estabelecimento_id: estabelecimentoId,
       });
       if (error) throw error;
 
