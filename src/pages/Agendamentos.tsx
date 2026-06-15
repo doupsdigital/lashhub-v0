@@ -57,7 +57,7 @@ const DIAS_SEMANA = [
 ];
 
 export default function Agendamentos() {
-  const { isProfissional } = useAuth();
+  const { isProfissional, estabelecimentoId } = useAuth();
   const [viewMode, setViewMode] = useState<'mensal' | 'semanal' | 'diaria'>('mensal');
   const [currentDate, setCurrentDate] = useState<Date>(() => {
     const d = new Date();
@@ -73,6 +73,16 @@ export default function Agendamentos() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [successModal, setSuccessModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    clientName: string;
+    services: string;
+    dateStr: string;
+    timeStr: string;
+    whatsappLink?: string;
+  } | null>(null);
 
   // Form / Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -132,12 +142,38 @@ export default function Agendamentos() {
     setTimeout(() => setSuccessMessage(null), 4000);
   };
 
+  const showSuccessFeedback = (appt: { data_hora: string; cliente?: { nome: string; sobrenome?: string | null; whatsapp?: string | null } | null; agendamento_servicos?: { servico?: { nome: string } }[] }, isNew: boolean) => {
+    const clientName = appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome || ''}`.trim() : 'Cliente';
+    const dateObj = new Date(appt.data_hora);
+    const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const timeStr = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const servicesList = appt.agendamento_servicos?.map(s => s.servico?.nome).join(', ') || 'Procedimento';
+
+    // Format phone for WhatsApp: only numbers
+    const phoneDigits = appt.cliente?.whatsapp ? appt.cliente.whatsapp.replace(/\D/g, '') : '';
+    
+    // Construct WhatsApp message
+    const message = `Olá, ${appt.cliente?.nome || 'cliente'}! Seu agendamento para *${servicesList}* no dia *${dateStr}* às *${timeStr}* está confirmado. Te aguardamos! 💖`;
+    const whatsappLink = phoneDigits ? `https://wa.me/55${phoneDigits}?text=${encodeURIComponent(message)}` : undefined;
+
+    setSuccessModal({
+      isOpen: true,
+      title: isNew ? 'Agendamento Cadastrado!' : 'Agendamento Confirmado!',
+      clientName,
+      services: servicesList,
+      dateStr,
+      timeStr,
+      whatsappLink
+    });
+  };
+
   // Fetch initial configuration data
   const fetchSetupData = async () => {
+    if (!estabelecimentoId) return;
     try {
       const [horariosRes, srvsRes] = await Promise.all([
-        supabase.from('horarios_atendimento').select('dia_semana, hora_inicio, hora_fim'),
-        supabase.from('servicos').select('*, variacoes_servico(*)').eq('ativo', true).order('nome')
+        supabase.from('horarios_atendimento').select('dia_semana, hora_inicio, hora_fim').eq('estabelecimento_id', estabelecimentoId),
+        supabase.from('servicos').select('*, variacoes_servico(*)').eq('ativo', true).eq('estabelecimento_id', estabelecimentoId).order('nome')
       ]);
       if (horariosRes.error) throw horariosRes.error;
       if (srvsRes.error) throw srvsRes.error;
@@ -151,6 +187,7 @@ export default function Agendamentos() {
 
   // Fetch appointments (including cancelled ones now)
   const fetchAppointments = async () => {
+    if (!estabelecimentoId) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -165,7 +202,8 @@ export default function Agendamentos() {
             servico:servicos(nome),
             variacao:variacoes_servico(nome)
           )
-        `);
+        `)
+        .eq('estabelecimento_id', estabelecimentoId);
 
       if (error) throw error;
       setAgendamentos(data || []);
@@ -186,9 +224,11 @@ export default function Agendamentos() {
   };
 
   useEffect(() => {
-    fetchSetupData();
-    fetchAppointments();
-  }, []);
+    if (estabelecimentoId) {
+      fetchSetupData();
+      fetchAppointments();
+    }
+  }, [estabelecimentoId]);
 
   // CLIENT AUTOCOMPLETE SEARCH
   useEffect(() => {
@@ -197,11 +237,13 @@ export default function Agendamentos() {
         setFoundClientes([]);
         return;
       }
+      if (!estabelecimentoId) return;
 
       try {
         const { data, error } = await supabase
           .from('clientes')
           .select('*')
+          .eq('estabelecimento_id', estabelecimentoId)
           .or(`nome.ilike.%${clientSearchQuery}%,sobrenome.ilike.%${clientSearchQuery}%,whatsapp.like.%${clientSearchQuery}%`)
           .limit(5);
 
@@ -217,7 +259,7 @@ export default function Agendamentos() {
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [clientSearchQuery]);
+  }, [clientSearchQuery, estabelecimentoId]);
 
 
 
@@ -285,9 +327,35 @@ export default function Agendamentos() {
     setFormObs('');
     setSelectedServices({});
     setFormDuracao(0);
-    setFormData(date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-    setFormHora(hourStr || '09:00');
+    
+    const targetDate = date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    setFormData(targetDate);
+
+    if (hourStr) {
+      setFormHora(hourStr);
+    } else {
+      const selectedDay = date || new Date();
+      const dayOfWeek = selectedDay.getDay();
+      const sched = workHoursConfig.find(h => h.dia_semana === dayOfWeek);
+      if (sched) {
+        setFormHora(sched.hora_inicio.substring(0, 5));
+      } else {
+        setFormHora('09:00');
+      }
+    }
     setIsModalOpen(true);
+  };
+
+  const handleDateChange = (newDateStr: string) => {
+    setFormData(newDateStr);
+    const dateObj = new Date(`${newDateStr}T12:00:00`);
+    const dayOfWeek = dateObj.getDay();
+    const sched = workHoursConfig.find(h => h.dia_semana === dayOfWeek);
+    if (sched) {
+      setFormHora(sched.hora_inicio.substring(0, 5));
+    } else {
+      setFormHora('09:00');
+    }
   };
 
   // OPEN EDIT FORM
@@ -447,6 +515,7 @@ export default function Agendamentos() {
       let agendaQuery = supabase
         .from('agendamentos')
         .select('*')
+        .eq('estabelecimento_id', estabelecimentoId)
         .neq('status', 'cancelado')
         .gte('data_hora', `${formData}T00:00:00Z`)
         .lte('data_hora', `${formData}T23:59:59Z`);
@@ -493,6 +562,7 @@ export default function Agendamentos() {
         const { data: apptResult, error: apptError } = await supabase
           .from('agendamentos')
           .insert({
+            estabelecimento_id: estabelecimentoId,
             cliente_id: selectedCliente.id,
             data_hora: startDateTime.toISOString(),
             duracao_minutos: formDuracao,
@@ -525,7 +595,17 @@ export default function Agendamentos() {
       if (relError) throw relError;
 
       setIsModalOpen(false);
-      showTemporarySuccess(editingAppt ? 'Agendamento atualizado com sucesso!' : 'Agendamento cadastrado com sucesso!');
+      if (editingAppt) {
+        showTemporarySuccess('Agendamento atualizado com sucesso!');
+      } else {
+        const client = selectedCliente;
+        const apptDataForFeedback = {
+          data_hora: startDateTime.toISOString(),
+          cliente: client ? { nome: client.nome, sobrenome: client.sobrenome, whatsapp: client.whatsapp } : undefined,
+          agendamento_servicos: servicesList.map(s => ({ servico: { nome: s.nome } }))
+        };
+        showSuccessFeedback(apptDataForFeedback, true);
+      }
       fetchAppointments();
     } catch (err) {
       console.error(err);
@@ -544,7 +624,7 @@ export default function Agendamentos() {
       if (error) throw error;
       const clientName = appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome}` : 'Cliente';
       await registrarLog('editou', 'agendamento', appt.id, `Confirmou agendamento de "${clientName}"`);
-      showTemporarySuccess('Agendamento confirmado!');
+      showSuccessFeedback(appt, false);
       fetchAppointments();
     } catch (err) {
       console.error(err);
@@ -991,6 +1071,7 @@ export default function Agendamentos() {
             {getDaysOfMonthGrid(currentDate).map((day, idx) => {
               const isCurrentMonth = day.getMonth() === currentDate.getMonth();
               const isToday = new Date().toDateString() === day.toDateString();
+              const isDayClosed = workHoursConfig.length > 0 && !workHoursConfig.some(h => h.dia_semana === day.getDay());
               
               const dayAppts = visibleAppointments.filter(appt => 
                 new Date(appt.data_hora).toDateString() === day.toDateString()
@@ -999,12 +1080,21 @@ export default function Agendamentos() {
               return (
                 <div 
                   key={idx}
-                  onClick={() => handleOpenForm(day)}
-                  className={`p-2 flex flex-col justify-between overflow-hidden cursor-pointer hover:bg-rose-50/20 transition-all ${isCurrentMonth ? 'bg-white' : 'bg-gray-50/40 text-text-muted/60'}`}
+                  onClick={() => !isDayClosed && handleOpenForm(day)}
+                  className={`p-2 flex flex-col justify-between overflow-hidden transition-all ${
+                    isDayClosed 
+                      ? 'bg-gray-100/50 cursor-not-allowed text-text-muted/40' 
+                      : `cursor-pointer hover:bg-rose-50/20 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50/40'}`
+                  }`}
                 >
-                  <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold ${isToday ? 'bg-rose-600 text-white font-bold' : 'text-text-secondary'}`}>
-                    {day.getDate()}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold ${isToday ? 'bg-rose-600 text-white font-bold' : 'text-text-secondary'}`}>
+                      {day.getDate()}
+                    </span>
+                    {isDayClosed && (
+                      <span className="text-[10px] text-text-muted" title="Dia Fechado">🔒</span>
+                    )}
+                  </div>
 
                   <div className="flex-1 overflow-y-auto space-y-1 mt-1.5">
                     {dayAppts.slice(0, 3).map(appt => {
@@ -1454,7 +1544,7 @@ export default function Agendamentos() {
                     type="date" 
                     required
                     value={formData}
-                    onChange={(e) => setFormData(e.target.value)}
+                    onChange={(e) => handleDateChange(e.target.value)}
                     className="w-full px-3 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400"
                   />
                 </div>
@@ -1587,6 +1677,74 @@ export default function Agendamentos() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SUCCESS CONFIRMATION MODAL */}
+      {successModal && successModal.isOpen && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-[14px] border border-border shadow-xl w-full max-w-md p-6 text-center animate-slide-up space-y-4">
+            
+            {/* Animated Check Icon */}
+            <div className="mx-auto w-16 h-16 rounded-full bg-green-50 border border-green-200 flex items-center justify-center text-green-600 animate-pulse">
+              <CheckCircle className="w-9 h-9" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-title font-bold text-xl text-text-primary">
+                {successModal.title}
+              </h3>
+              <p className="text-xs text-text-secondary">
+                Os dados da reserva foram registrados com sucesso no sistema.
+              </p>
+            </div>
+
+            {/* Details Box */}
+            <div className="bg-bg/40 border border-border/80 rounded-xl p-4 text-left text-xs space-y-2.5">
+              <div className="flex justify-between border-b border-border/40 pb-1.5">
+                <span className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Cliente</span>
+                <span className="font-semibold text-text-primary">{successModal.clientName}</span>
+              </div>
+              <div className="flex justify-between border-b border-border/40 pb-1.5">
+                <span className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Procedimento(s)</span>
+                <span className="font-semibold text-text-primary max-w-[200px] truncate text-right">{successModal.services}</span>
+              </div>
+              <div className="flex justify-between border-b border-border/40 pb-1.5">
+                <span className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Data</span>
+                <span className="font-semibold text-text-primary">{successModal.dateStr}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold text-text-secondary uppercase text-[10px] tracking-wider">Horário</span>
+                <span className="font-semibold text-text-primary">{successModal.timeStr}</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-2 pt-2">
+              {successModal.whatsappLink && (
+                <a
+                  href={successModal.whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 py-2.5 w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                >
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.504-5.714-1.463L0 24zm6.59-4.846c1.6.95 3.498 1.45 5.419 1.451 5.46 0 9.902-4.444 9.905-9.908.002-2.647-1.02-5.136-2.883-7c-1.864-1.864-4.354-2.887-7.003-2.888-5.466 0-9.912 4.446-9.915 9.91-.001 1.916.501 3.791 1.454 5.392l-.998 3.642 3.73-.979zm11.387-5.45c-.35-.175-2.072-1.022-2.392-1.139-.32-.117-.552-.175-.782.175-.23.35-.89 1.139-1.093 1.37-.202.23-.405.26-.755.085-.35-.175-1.477-.544-2.813-1.735-1.039-.927-1.74-2.071-1.944-2.422-.203-.35-.022-.54.153-.715.156-.156.35-.407.525-.612.175-.205.233-.35.35-.583.117-.233.058-.438-.029-.613-.088-.175-.782-1.884-1.072-2.585-.283-.682-.571-.59-.78-.601-.201-.01-.43-.01-.659-.01-.23 0-.604.085-.92.438-.316.35-1.207 1.18-1.207 2.877 0 1.696 1.233 3.332 1.408 3.566.175.233 2.427 3.7 5.877 5.188.82.354 1.46.566 1.96.726.824.262 1.575.225 2.168.137.66-.098 2.072-.847 2.364-1.666.292-.818.292-1.52.204-1.666-.088-.146-.32-.233-.67-.408z"/>
+                  </svg>
+                  Enviar Confirmação por WhatsApp
+                </a>
+              )}
+              
+              <button
+                type="button"
+                onClick={() => setSuccessModal(null)}
+                className="py-2 border border-border hover:bg-bg rounded-lg text-xs font-semibold text-text-secondary transition-colors cursor-pointer"
+              >
+                Concluir e Fechar
+              </button>
+            </div>
+
           </div>
         </div>
       )}
