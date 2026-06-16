@@ -265,5 +265,13 @@ body {
   background-color: var(--bg) !important;
   opacity: 0.45 !important;
 }
+/* Remove as setas de aumentar/diminuir de campos de número globalmente */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 
-
+input[type=number] {
+  -moz-appearance: textfield;
+}
