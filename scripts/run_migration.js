@@ -18,7 +18,7 @@ const client = new Client({
 async function run() {
   try {
     console.log('Lendo o arquivo de migração...');
-    const sqlPath = 'c:/Users/doni.silva/Downloads/lashly-saas/scripts/etapa5_migracao.sql';
+    const sqlPath = path.join(process.cwd(), 'scripts', 'etapa5_migracao.sql');
     const sql = fs.readFileSync(sqlPath, 'utf8');
 
     console.log('Conectando ao banco de dados Supabase...');
