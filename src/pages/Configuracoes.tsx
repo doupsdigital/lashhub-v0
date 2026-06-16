@@ -935,11 +935,15 @@ export default function Configuracoes() {
         ) : (
           <div className="mt-4 space-y-6">
             {/* Toggle: Aprovação automática */}
-            <div className="flex items-start justify-between gap-4 p-4 border border-border rounded-lg bg-bg">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-text-primary">
-                  Confirmar agendamentos do portal automaticamente
-                </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary block">
+                Agendamento Automático
+              </label>
+              <div className="flex items-start justify-between gap-4 p-4 border border-border rounded-lg bg-bg">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-text-primary">
+                    Confirmar agendamentos do portal automaticamente
+                  </p>
                 <p className="text-xs text-text-secondary mt-1">
                   {aprovacaoAutomatica
                     ? 'Agendamentos feitos pelas clientes já ficam confirmados.'
@@ -962,8 +966,9 @@ export default function Configuracoes() {
                 />
               </button>
             </div>
+          </div>
 
-            {/* Antecedência mínima */}
+          {/* Antecedência mínima */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary block">
                 Horas mínimas para cancelamento pela cliente
