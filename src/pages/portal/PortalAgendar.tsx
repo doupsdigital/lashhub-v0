@@ -334,13 +334,12 @@ export default function PortalAgendar() {
 
         if (!horarioDia) { setSlots([]); return; }
 
+        // Usa função SECURITY DEFINER para contornar RLS e buscar slots ocupados do dia
         const { data: agData } = await supabase
-          .from('agendamentos')
-          .select('data_hora, duracao_minutos')
-          .eq('estabelecimento_id', establishmentId)
-          .gte('data_hora', `${dataSelecionada}T00:00:00Z`)
-          .lte('data_hora', `${dataSelecionada}T23:59:59Z`)
-          .in('status', ['pendente', 'confirmado']);
+          .rpc('get_slots_ocupados', {
+            p_estabelecimento_id: establishmentId,
+            p_data: dataSelecionada,
+          });
 
         const blocksForDay = bloqueios.filter(b => dataSelecionada >= b.data_inicio && dataSelecionada <= b.data_fim);
         setSlots(gerarSlots(horarioDia.hora_inicio, horarioDia.hora_fim, duracaoTotal, agData || [], blocksForDay));
@@ -401,13 +400,12 @@ export default function PortalAgendar() {
       const horarioDia = horarios.find(h => h.dia_semana === diaSemana);
 
       if (horarioDia) {
+        // Re-verifica usando a mesma função SECURITY DEFINER (race condition check)
         const { data: agRecentes } = await supabase
-          .from('agendamentos')
-          .select('data_hora, duracao_minutos')
-          .eq('estabelecimento_id', establishmentId)
-          .gte('data_hora', `${dataSelecionada}T00:00:00Z`)
-          .lte('data_hora', `${dataSelecionada}T23:59:59Z`)
-          .in('status', ['pendente', 'confirmado']);
+          .rpc('get_slots_ocupados', {
+            p_estabelecimento_id: establishmentId,
+            p_data: dataSelecionada,
+          });
 
         const blocksForDay = bloqueios.filter(b => dataSelecionada >= b.data_inicio && dataSelecionada <= b.data_fim);
         const slotsAtuais = gerarSlots(
@@ -472,7 +470,30 @@ export default function PortalAgendar() {
           : err && typeof err === 'object' && 'message' in err
           ? String((err as { message: unknown }).message)
           : '';
-      if (msg.includes('permission') || msg.includes('policy') || msg.includes('violat') || msg.includes('42501')) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? String((err as { code: unknown }).code)
+          : '';
+
+      // 23P01 = exclusion_violation (constraint de sobreposição do banco)
+      if (code === '23P01' || msg.includes('no_overlap') || msg.includes('overlap')) {
+        // Horário foi tomado enquanto a cliente confirmava — recarrega slots e volta para etapa 3
+        const { data: agErr } = await supabase
+          .rpc('get_slots_ocupados', {
+            p_estabelecimento_id: establishmentId,
+            p_data: dataSelecionada as string,
+          });
+        const [yyy, mmm, ddd] = (dataSelecionada as string).split('-').map(Number);
+        const diaSemErr = new Date(yyy, mmm - 1, ddd).getDay();
+        const horarioDiaErr = horarios.find(h => h.dia_semana === diaSemErr);
+        if (horarioDiaErr) {
+          const blocksErr = bloqueios.filter(b => (dataSelecionada as string) >= b.data_inicio && (dataSelecionada as string) <= b.data_fim);
+          setSlots(gerarSlots(horarioDiaErr.hora_inicio, horarioDiaErr.hora_fim, duracaoTotal, agErr || [], blocksErr));
+        }
+        setHorarioSelecionado(null);
+        setErroSalvar('race');
+        setEtapa(3);
+      } else if (msg.includes('permission') || msg.includes('policy') || msg.includes('violat') || msg.includes('42501')) {
         setErroSalvar('perm');
       } else {
         setErroSalvar('generic');
