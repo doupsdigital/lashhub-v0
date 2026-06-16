@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Clock, CalendarOff, Plus, Trash2, AlertCircle, Sparkles } from 'lucide-react';
+import { Clock, CalendarOff, Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
 import type { HorarioAtendimento, BloqueioAgenda } from '../types';
 import ConfirmModal from '../components/common/ConfirmModal';
 
@@ -357,12 +357,7 @@ export default function MeusHorarios() {
             <p className="text-xs font-medium">{horariosError}</p>
           </div>
         )}
-        {horariosSuccess && (
-          <div className="mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2.5">
-            <Sparkles className="w-5 h-5 text-green-600 flex-shrink-0" />
-            <p className="text-xs font-medium">{horariosSuccess}</p>
-          </div>
-        )}
+
 
         <div className="flex justify-end pt-4">
           <button
@@ -474,12 +469,7 @@ export default function MeusHorarios() {
               <p className="text-xs font-medium">{bloqueioError}</p>
             </div>
           )}
-          {bloqueioSuccess && (
-            <div className="mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2.5">
-              <Sparkles className="w-5 h-5 text-green-600 flex-shrink-0" />
-              <p className="text-xs font-medium">{bloqueioSuccess}</p>
-            </div>
-          )}
+
 
           <div className="flex justify-end mt-4">
             <button
@@ -554,6 +544,54 @@ export default function MeusHorarios() {
         }
         confirmText="Excluir"
       />
+
+      {/* WEEKLY SCHEDULE SUCCESS MODAL */}
+      {horariosSuccess && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-[14px] border border-border shadow-xl w-full max-w-sm p-6 text-center animate-slide-up space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-full bg-green-50 border border-green-200 flex items-center justify-center text-green-600 animate-pulse">
+              <CheckCircle className="w-9 h-9" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-title font-bold text-xl text-text-primary">Salvo com Sucesso!</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">{horariosSuccess}</p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setHorariosSuccess(null)}
+                className="w-full py-2.5 bg-rose-600 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BLOCKING SUCCESS MODAL */}
+      {bloqueioSuccess && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-[14px] border border-border shadow-xl w-full max-w-sm p-6 text-center animate-slide-up space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-full bg-green-50 border border-green-200 flex items-center justify-center text-green-600 animate-pulse">
+              <CheckCircle className="w-9 h-9" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-title font-bold text-xl text-text-primary">Bloqueio Confirmado!</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">{bloqueioSuccess}</p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setBloqueioSuccess(null)}
+                className="w-full py-2.5 bg-rose-600 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
