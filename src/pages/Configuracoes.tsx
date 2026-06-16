@@ -51,7 +51,7 @@ export default function Configuracoes() {
   const [enderecoNegocio, setEnderecoNegocio] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [aprovacaoAutomatica, setAprovacaoAutomatica] = useState(false);
-  const [antecedenciaHoras, setAntecedenciaHoras] = useState(24);
+  const [antecedenciaHoras, setAntecedenciaHoras] = useState<number | ''>(24);
   const [mensagemPosAgendamento, setMensagemPosAgendamento] = useState('');
   const [paletaCores, setPaletaCores] = useState('rosa_rose');
   const [modoEscuro, setModoEscuro] = useState(false);
@@ -382,7 +382,7 @@ export default function Configuracoes() {
         .from('configuracao_negocio')
         .update({
           aprovacao_automatica: aprovacaoAutomatica,
-          antecedencia_cancelamento_horas: antecedenciaHoras,
+          antecedencia_cancelamento_horas: antecedenciaHoras === '' ? 0 : Number(antecedenciaHoras),
           mensagem_pos_agendamento: mensagemPosAgendamento.trim(),
         })
         .eq('id', configuracaoId);
@@ -981,7 +981,10 @@ export default function Configuracoes() {
                   type="number"
                   min={0}
                   value={antecedenciaHoras}
-                  onChange={(e) => setAntecedenciaHoras(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAntecedenciaHoras(val === '' ? '' : Number(val));
+                  }}
                   className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-bg text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-rose-400 transition-all"
                 />
               </div>
