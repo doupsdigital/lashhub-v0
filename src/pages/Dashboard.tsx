@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -94,6 +95,7 @@ const getWeekLabel = (date: Date, start: Date) => {
 
 export default function Dashboard() {
   const { estabelecimentoId } = useAuth();
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<PeriodType>('esteMes');
   
   // Custom date range states
@@ -598,7 +600,10 @@ export default function Dashboard() {
             </div>
 
             {/* KPI 4: Agendamentos Pendentes */}
-            <div className="bg-white border border-amber-200 rounded-[14px] p-5 flex items-center justify-between shadow-sm">
+            <div
+              onClick={() => pendingAppointments > 0 && navigate('/agendamentos', { state: { openPending: true } })}
+              className={`bg-white border border-amber-200 rounded-[14px] p-5 flex items-center justify-between shadow-sm transition-colors ${pendingAppointments > 0 ? 'cursor-pointer hover:bg-amber-50/60' : ''}`}
+            >
               <div className="space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Aguardando Confirmação</span>
                 <p className="text-3xl font-title font-semibold text-amber-700">{pendingAppointments}</p>

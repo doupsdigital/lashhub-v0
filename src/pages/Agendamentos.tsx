@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
   Plus,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   CalendarDays,
   Search,
   AlertCircle,
@@ -59,6 +60,7 @@ const DIAS_SEMANA = [
 
 export default function Agendamentos() {
   const { isProfissional, estabelecimentoId } = useAuth();
+  const location = useLocation();
   const [viewMode, setViewMode] = useState<'mensal' | 'semanal' | 'diaria'>('mensal');
   const [currentDate, setCurrentDate] = useState<Date>(() => {
     const d = new Date();
@@ -130,6 +132,15 @@ export default function Agendamentos() {
   const [formHora, setFormHora] = useState('09:00');
   const [formDuracao, setFormDuracao] = useState(30);
   const [formObs, setFormObs] = useState('');
+
+  const [pendingOpen, setPendingOpen] = useState(() => !!(location.state as { openPending?: boolean })?.openPending);
+
+  const [rejectModalAppt, setRejectModalAppt] = useState<AgendamentoWithRelations | null>(null);
+  const [rejectMotivo, setRejectMotivo] = useState('');
+  const [rejectSaving, setRejectSaving] = useState(false);
+
+  const [approveModalAppt, setApproveModalAppt] = useState<AgendamentoWithRelations | null>(null);
+  const [approveSaving, setApproveSaving] = useState(false);
   
   // Selected services in the form
   const [selectedServices, setSelectedServices] = useState<Record<string, AgendamentoServicoInput>>({});
@@ -639,6 +650,93 @@ export default function Agendamentos() {
     }
   };
 
+  const openWhatsApp = (appt: AgendamentoWithRelations, tipo: 'aprovado' | 'recusado', motivo?: string) => {
+    const whatsapp = appt.cliente?.whatsapp;
+    if (!whatsapp) return;
+    const phone = '55' + whatsapp.replace(/\D/g, '');
+    const apptDate = new Date(appt.data_hora);
+    const dateStr = apptDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const timeStr = apptDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const servicos = appt.agendamento_servicos?.map(s => s.servico?.nome).filter(Boolean).join(', ') || '';
+    const firstName = appt.cliente?.nome || 'cliente';
+    let msg: string;
+    if (tipo === 'aprovado') {
+      msg = `Olá ${firstName}! 🎉 Seu agendamento foi *confirmado*!\n\n📅 *Data:* ${dateStr}\n🕐 *Horário:* ${timeStr}\n💆 *Serviço:* ${servicos}\n\nTe esperamos! 😊`;
+    } else {
+      const motivoLinha = motivo?.trim() ? `\n\n_${motivo.trim()}_` : '';
+      msg = `Olá ${firstName}! Infelizmente precisamos recusar seu agendamento de *${dateStr} às ${timeStr}*.${motivoLinha}\n\nEntre em contato para reagendarmos. 💗`;
+    }
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  const handleOpenRejectModal = (appt: AgendamentoWithRelations) => {
+    setRejectMotivo('');
+    setRejectModalAppt(appt);
+  };
+
+  const handleRejectConfirm = async (sendWhatsApp: boolean) => {
+    if (!rejectModalAppt) return;
+    setRejectSaving(true);
+    const appt = rejectModalAppt;
+    const clientName = appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome}` : 'Cliente';
+    try {
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({ status: 'cancelado' })
+        .eq('id', appt.id);
+      if (error) throw error;
+      await registrarLog('editou', 'agendamento', appt.id, `Recusou agendamento de "${clientName}"`);
+      setRejectModalAppt(null);
+      setIsDetailOpen(false);
+      fetchAppointments();
+      if (sendWhatsApp) openWhatsApp(appt, 'recusado', rejectMotivo);
+      const dateObj = new Date(appt.data_hora);
+      setSuccessModal({
+        isOpen: true,
+        title: 'Agendamento Recusado',
+        clientName: appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome || ''}`.trim() : 'Cliente',
+        services: appt.agendamento_servicos?.map(s => s.servico?.nome).join(', ') || '—',
+        dateStr: dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }),
+        timeStr: dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        whatsappLink: undefined,
+      });
+    } catch (err) {
+      console.error(err);
+      showTemporaryError('Falha ao recusar agendamento.');
+    } finally {
+      setRejectSaving(false);
+    }
+  };
+
+  const handleOpenApproveModal = (appt: AgendamentoWithRelations) => {
+    setApproveModalAppt(appt);
+  };
+
+  const handleApproveConfirm = async (sendWhatsApp: boolean) => {
+    if (!approveModalAppt) return;
+    setApproveSaving(true);
+    const appt = approveModalAppt;
+    try {
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({ status: 'confirmado' })
+        .eq('id', appt.id);
+      if (error) throw error;
+      const clientName = appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome}` : 'Cliente';
+      await registrarLog('editou', 'agendamento', appt.id, `Confirmou agendamento de "${clientName}"`);
+      setApproveModalAppt(null);
+      setIsDetailOpen(false);
+      showSuccessFeedback(appt, false);
+      fetchAppointments();
+      if (sendWhatsApp) openWhatsApp(appt, 'aprovado');
+    } catch (err) {
+      console.error(err);
+      showTemporaryError('Falha ao confirmar agendamento.');
+    } finally {
+      setApproveSaving(false);
+    }
+  };
+
   const handleConfirmAppointment = async (appt: AgendamentoWithRelations) => {
     try {
       const { error } = await supabase
@@ -726,15 +824,16 @@ export default function Agendamentos() {
           if (error) throw error;
 
           await registrarLog(
-            'editou', 
-            'agendamento', 
-            appt.id, 
+            'editou',
+            'agendamento',
+            appt.id,
             `Alterou status do agendamento de "${clientName}" para "${newStatus}"`
           );
 
           setIsDetailOpen(false);
           showTemporarySuccess(`Agendamento cancelado!`);
           fetchAppointments();
+          if (appt.status === 'pendente') openWhatsApp(appt, 'recusado');
         } catch (err) {
           console.error(err);
           showTemporaryError(`Falha ao alterar status do agendamento.`);
@@ -778,13 +877,13 @@ export default function Agendamentos() {
   const getStatusColorStyles = (status: string = 'confirmado') => {
     switch (status) {
       case 'cancelado':
-        return { border: 'border-gray-200', bg: 'bg-gray-100/50 hover:bg-gray-200/50 text-gray-400 line-through opacity-50', badge: 'bg-gray-200 text-gray-600', text: 'text-gray-500' };
+        return { border: 'border-gray-200', bg: 'bg-gray-100 hover:bg-gray-200 text-gray-400 line-through opacity-50', badge: 'bg-gray-200 text-gray-600', text: 'text-gray-500' };
       case 'concluido':
-        return { border: 'border-emerald-300', bg: 'bg-emerald-50/90 hover:bg-emerald-100/90 text-emerald-800', badge: 'bg-emerald-200 text-emerald-950', text: 'text-emerald-900' };
+        return { border: 'border-emerald-300', bg: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800', badge: 'bg-emerald-200 text-emerald-950', text: 'text-emerald-900' };
       case 'pendente':
-        return { border: 'border-amber-300', bg: 'bg-amber-50/95 hover:bg-amber-100 text-amber-800', badge: 'bg-amber-200 text-amber-900', text: 'text-amber-900' };
+        return { border: 'border-amber-300', bg: 'bg-amber-50 hover:bg-amber-100 text-amber-800', badge: 'bg-amber-200 text-amber-900', text: 'text-amber-900' };
       default: // confirmado
-        return { border: 'border-rose-300', bg: 'bg-rose-50/95 hover:bg-rose-100 text-rose-800', badge: 'bg-rose-200 text-rose-900', text: 'text-rose-900' };
+        return { border: 'border-rose-300', bg: 'bg-rose-50 hover:bg-rose-100 text-rose-800', badge: 'bg-rose-200 text-rose-900', text: 'text-rose-900' };
     }
   };
 
@@ -792,37 +891,50 @@ export default function Agendamentos() {
   const startHour = 8;
   const endHour = 20;
   const hourSlots = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
+  const halfHourSlots = Array.from({ length: (endHour - startHour) * 2 }, (_, i) => ({
+    hour: startHour + Math.floor(i / 2),
+    minute: (i % 2) * 30,
+  }));
 
   const formatDateStr = (date: Date) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
 
   // Availability validation using global horarios_atendimento and bloqueios
-  const isHourAvailable = (date: Date, hour: number) => {
+  const isHourAvailable = (date: Date, hour: number, minute = 0) => {
     const ds = formatDateStr(date);
-    
+
     const isFullDayBlocked = bloqueios.some(b => b.dia_inteiro !== false && ds >= b.data_inicio && ds <= b.data_fim);
     if (isFullDayBlocked) return false;
 
-    const hourStrStart = `${hour.toString().padStart(2, '0')}:00:00`;
-    const hourStrEnd = `${(hour + 1).toString().padStart(2, '0')}:00:00`;
-    const isHourBlocked = bloqueios.some(b => {
+    const hh = hour.toString().padStart(2, '0');
+    const mm = minute.toString().padStart(2, '0');
+    const slotStrStart = `${hh}:${mm}:00`;
+    const endTotal = hour * 60 + minute + 30;
+    const slotStrEnd = `${Math.floor(endTotal / 60).toString().padStart(2, '0')}:${(endTotal % 60).toString().padStart(2, '0')}:00`;
+
+    const isSlotBlocked = bloqueios.some(b => {
       if (b.dia_inteiro === false && b.hora_inicio && b.hora_fim && ds >= b.data_inicio && ds <= b.data_fim) {
-        return hourStrStart < b.hora_fim && hourStrEnd > b.hora_inicio;
+        return slotStrStart < b.hora_fim && slotStrEnd > b.hora_inicio;
       }
       return false;
     });
-    if (isHourBlocked) return false;
+    if (isSlotBlocked) return false;
 
     if (workHoursConfig.length === 0) return true;
     const dayOfWeek = date.getDay();
     const sched = workHoursConfig.find(h => h.dia_semana === dayOfWeek);
     if (!sched) return false;
-    const hourStr = `${hour.toString().padStart(2, '0')}:00:00`;
-    return hourStr >= sched.hora_inicio && hourStr < sched.hora_fim;
+    return slotStrStart >= sched.hora_inicio && slotStrStart < sched.hora_fim;
   };
 
   const visibleAppointments = agendamentos;
+  const pendingAppts = agendamentos.filter(a => a.status === 'pendente');
+
+  useEffect(() => {
+    if (pendingAppts.length > 0) setPendingOpen(true);
+    else setPendingOpen(false);
+  }, [pendingAppts.length]);
 
   return (
     <div className="space-y-6">
@@ -914,6 +1026,65 @@ export default function Agendamentos() {
         </div>
       </div>
 
+      {/* Pending Appointments Panel */}
+      {pendingAppts.length > 0 && (
+        <div className="bg-white border border-amber-200 rounded-[14px] shadow-sm overflow-hidden">
+          <button
+            onClick={() => setPendingOpen(o => !o)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-amber-50/50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <span className="font-title font-semibold text-base text-text-primary">Aguardando confirmação</span>
+              <span className="bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold px-2 py-0.5 rounded-full">
+                {pendingAppts.length}
+              </span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-text-secondary transition-transform duration-200 ${pendingOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {pendingOpen && (
+            <div className="border-t border-amber-100 divide-y divide-border/40">
+              {pendingAppts.map(appt => {
+                const apptDate = new Date(appt.data_hora);
+                const dateLabel = apptDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                const timeLabel = apptDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const servicos = appt.agendamento_servicos?.map(s => s.servico?.nome).filter(Boolean).join(', ') || '—';
+                return (
+                  <div key={appt.id} className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-amber-50/30 transition-colors">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-text-primary truncate">
+                          {appt.cliente?.nome} {appt.cliente?.sobrenome}
+                        </p>
+                        <p className="text-xs text-text-secondary mt-0.5">{dateLabel} às {timeLabel}</p>
+                      </div>
+                      <p className="text-xs text-text-muted truncate hidden sm:block">{servicos}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleOpenApproveModal(appt)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={() => handleOpenRejectModal(appt)}
+                        className="flex items-center gap-1 px-3 py-1.5 border border-red-300 text-red-600 hover:bg-red-50 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Recusar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* CALENDAR BODY */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-40 text-text-secondary bg-surface border rounded-[14px]">
@@ -941,14 +1112,13 @@ export default function Agendamentos() {
             </div>
 
             {/* Grid Body */}
-            <div className="grid grid-cols-[60px_repeat(7,1fr)] h-[600px] overflow-y-auto relative bg-bg/5">
-              
+            <div className="grid grid-cols-[60px_repeat(7,1fr)] h-[720px] overflow-y-auto relative bg-bg/5">
+
               {/* Hour slot labels */}
               <div className="border-r border-border bg-white text-right pr-2 text-[10px] font-bold text-text-secondary select-none">
-                {hourSlots.map(hour => (
-                  <div key={hour} className="h-[50px] border-b border-border/50 pt-1 flex flex-col justify-between">
-                    <span>{hour.toString().padStart(2, '0')}:00</span>
-                    <span className="text-[8px] text-text-muted/60 font-normal">{hour.toString().padStart(2, '0')}:30</span>
+                {halfHourSlots.map(({ hour, minute }) => (
+                  <div key={`${hour}-${minute}`} className={`h-[30px] border-b border-border/50 flex items-center justify-end pr-1 ${minute === 0 ? 'font-bold' : 'font-normal text-[8px] text-text-muted/60'}`}>
+                    <span>{hour.toString().padStart(2, '0')}:{minute.toString().padStart(2, '0')}</span>
                   </div>
                 ))}
               </div>
@@ -962,14 +1132,15 @@ export default function Agendamentos() {
 
                 return (
                   <div key={day.toISOString()} className="relative border-r border-border last:border-r-0 h-full group">
-                    {/* Hour slots background */}
-                    {hourSlots.map(hour => {
-                      const isAvailable = isHourAvailable(day, hour);
+                    {/* Half-hour slots background */}
+                    {halfHourSlots.map(({ hour, minute }) => {
+                      const isAvailable = isHourAvailable(day, hour, minute);
                       return (
                         <div
-                          key={hour}
-                          onClick={() => isAvailable && handleOpenForm(day, `${hour.toString().padStart(2, '0')}:00`)}
-                          className={`h-[50px] border-b border-border/50 transition-colors cursor-pointer flex items-center justify-center
+                          key={`${hour}-${minute}`}
+                          onClick={() => isAvailable && handleOpenForm(day, `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`)}
+                          className={`h-[30px] transition-colors cursor-pointer flex items-center justify-center
+                            ${minute === 30 ? 'border-b border-border/50' : ''}
                             ${isAvailable ? 'hover:bg-rose-50/30' : 'bg-gray-100/55 cursor-not-allowed text-text-muted/40 font-semibold text-[10px]'}`}
                           title={isAvailable ? 'Clique para agendar' : 'Horário indisponível / Fechado'}
                         >
@@ -982,8 +1153,8 @@ export default function Agendamentos() {
                     {dayAppts.map(appt => {
                       const apptDate = new Date(appt.data_hora);
                       const startHourVal = apptDate.getHours() + apptDate.getMinutes() / 60;
-                      const top = (startHourVal - startHour) * 50;
-                      const height = (appt.duracao_minutos / 60) * 50;
+                      const top = (startHourVal - startHour) * 60;
+                      const height = (appt.duracao_minutos / 60) * 60;
                       const colors = getStatusColorStyles(appt.status);
                       return (
                         <div
@@ -1027,26 +1198,26 @@ export default function Agendamentos() {
             </div>
           </div>
 
-          <div className="grid grid-cols-[60px_1fr] h-[550px] overflow-y-auto relative bg-bg/5">
+          <div className="grid grid-cols-[60px_1fr] h-[720px] overflow-y-auto relative bg-bg/5">
             {/* Hours Labels */}
             <div className="border-r border-border bg-white text-right pr-2 text-[10px] font-bold text-text-secondary select-none">
-              {hourSlots.map(hour => (
-                <div key={hour} className="h-[50px] border-b border-border/50 pt-1 flex flex-col justify-between">
-                  <span>{hour.toString().padStart(2, '0')}:00</span>
-                  <span className="text-[8px] text-text-muted/60 font-normal">{hour.toString().padStart(2, '0')}:30</span>
+              {halfHourSlots.map(({ hour, minute }) => (
+                <div key={`${hour}-${minute}`} className={`h-[30px] border-b border-border/50 flex items-center justify-end pr-1 ${minute === 0 ? 'font-bold' : 'font-normal text-[8px] text-text-muted/60'}`}>
+                  <span>{hour.toString().padStart(2, '0')}:{minute.toString().padStart(2, '0')}</span>
                 </div>
               ))}
             </div>
 
             {/* Time Grid */}
             <div className="relative h-full">
-              {hourSlots.map(hour => {
-                const isAvailable = isHourAvailable(currentDate, hour);
+              {halfHourSlots.map(({ hour, minute }) => {
+                const isAvailable = isHourAvailable(currentDate, hour, minute);
                 return (
                   <div
-                    key={hour}
-                    onClick={() => isAvailable && handleOpenForm(currentDate, `${hour.toString().padStart(2, '0')}:00`)}
-                    className={`h-[50px] border-b border-border/50 transition-colors cursor-pointer flex items-center justify-center
+                    key={`${hour}-${minute}`}
+                    onClick={() => isAvailable && handleOpenForm(currentDate, `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`)}
+                    className={`h-[30px] transition-colors cursor-pointer flex items-center justify-center
+                      ${minute === 30 ? 'border-b border-border/50' : ''}
                       ${isAvailable ? 'hover:bg-rose-50/30' : 'bg-gray-100/55 cursor-not-allowed text-text-muted/40'}`}
                   >
                     {!isAvailable && '🔒 Indisponível'}
@@ -1060,8 +1231,8 @@ export default function Agendamentos() {
                 .map(appt => {
                   const apptDate = new Date(appt.data_hora);
                   const startHourVal = apptDate.getHours() + apptDate.getMinutes() / 60;
-                  const top = (startHourVal - startHour) * 50;
-                  const height = (appt.duracao_minutos / 60) * 50;
+                  const top = (startHourVal - startHour) * 60;
+                  const height = (appt.duracao_minutos / 60) * 60;
 
                   const colors = getStatusColorStyles(appt.status);
 
@@ -1288,14 +1459,14 @@ export default function Agendamentos() {
                 {selectedAppt.status === 'pendente' && (
                   <>
                     <button
-                      onClick={() => handleConfirmAppointment(selectedAppt)}
+                      onClick={() => handleOpenApproveModal(selectedAppt)}
                       className="flex items-center justify-center gap-1.5 py-2 w-full bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold cursor-pointer"
                     >
                       <CheckCircle className="w-4 h-4" />
                       Confirmar Agendamento
                     </button>
                     <button
-                      onClick={() => handleChangeStatus(selectedAppt, 'cancelado')}
+                      onClick={() => handleOpenRejectModal(selectedAppt)}
                       className="flex items-center justify-center gap-1.5 py-2 px-3 border border-red-200 hover:bg-red-50 text-red-600 rounded-lg text-xs font-semibold cursor-pointer"
                     >
                       <XCircle className="w-4 h-4" />
@@ -1769,20 +1940,6 @@ export default function Agendamentos() {
 
             {/* Actions */}
             <div className="flex flex-col gap-2 pt-2">
-              {successModal.whatsappLink && (
-                <a
-                  href={successModal.whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2.5 w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-                >
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.504-5.714-1.463L0 24zm6.59-4.846c1.6.95 3.498 1.45 5.419 1.451 5.46 0 9.902-4.444 9.905-9.908.002-2.647-1.02-5.136-2.883-7c-1.864-1.864-4.354-2.887-7.003-2.888-5.466 0-9.912 4.446-9.915 9.91-.001 1.916.501 3.791 1.454 5.392l-.998 3.642 3.73-.979zm11.387-5.45c-.35-.175-2.072-1.022-2.392-1.139-.32-.117-.552-.175-.782.175-.23.35-.89 1.139-1.093 1.37-.202.23-.405.26-.755.085-.35-.175-1.477-.544-2.813-1.735-1.039-.927-1.74-2.071-1.944-2.422-.203-.35-.022-.54.153-.715.156-.156.35-.407.525-.612.175-.205.233-.35.35-.583.117-.233.058-.438-.029-.613-.088-.175-.782-1.884-1.072-2.585-.283-.682-.571-.59-.78-.601-.201-.01-.43-.01-.659-.01-.23 0-.604.085-.92.438-.316.35-1.207 1.18-1.207 2.877 0 1.696 1.233 3.332 1.408 3.566.175.233 2.427 3.7 5.877 5.188.82.354 1.46.566 1.96.726.824.262 1.575.225 2.168.137.66-.098 2.072-.847 2.364-1.666.292-.818.292-1.52.204-1.666-.088-.146-.32-.233-.67-.408z"/>
-                  </svg>
-                  Enviar Confirmação por WhatsApp
-                </a>
-              )}
-              
               <button
                 type="button"
                 onClick={() => setSuccessModal(null)}
@@ -1807,6 +1964,124 @@ export default function Agendamentos() {
         cancelText={confirmModalConfig?.cancelText}
         type={confirmModalConfig?.type}
       />
+
+      {/* Approve Modal */}
+      {approveModalAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-title font-semibold text-lg text-text-primary">Confirmar agendamento</h3>
+                <p className="text-sm text-text-secondary mt-0.5">
+                  {approveModalAppt.cliente?.nome} {approveModalAppt.cliente?.sobrenome} —{' '}
+                  {new Date(approveModalAppt.data_hora).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })} às{' '}
+                  {new Date(approveModalAppt.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              <button onClick={() => setApproveModalAppt(null)} className="text-text-muted hover:text-text-primary cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-3 text-sm text-emerald-800 space-y-1">
+              <p className="font-semibold">Serviço(s):</p>
+              <p>{approveModalAppt.agendamento_servicos?.map(s => s.servico?.nome).filter(Boolean).join(', ') || '—'}</p>
+              {approveModalAppt.observacoes && (
+                <p className="text-emerald-700 italic text-xs mt-1">"{approveModalAppt.observacoes}"</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                onClick={() => handleApproveConfirm(true)}
+                disabled={approveSaving}
+                className="flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {approveSaving ? 'Confirmando...' : 'Confirmar e enviar pelo WhatsApp'}
+              </button>
+              <button
+                onClick={() => handleApproveConfirm(false)}
+                disabled={approveSaving}
+                className="flex items-center justify-center gap-2 w-full py-2.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {approveSaving ? 'Confirmando...' : 'Confirmar sem enviar'}
+              </button>
+              <button
+                onClick={() => setApproveModalAppt(null)}
+                disabled={approveSaving}
+                className="w-full py-2.5 border border-border hover:bg-bg text-text-secondary rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Voltar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModalAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-title font-semibold text-lg text-text-primary">Recusar agendamento</h3>
+                <p className="text-sm text-text-secondary mt-0.5">
+                  {rejectModalAppt.cliente?.nome} {rejectModalAppt.cliente?.sobrenome} —{' '}
+                  {new Date(rejectModalAppt.data_hora).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })} às{' '}
+                  {new Date(rejectModalAppt.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              <button onClick={() => setRejectModalAppt(null)} className="text-text-muted hover:text-text-primary cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                Motivo <span className="font-normal normal-case text-text-muted">(opcional)</span>
+              </label>
+              <textarea
+                value={rejectMotivo}
+                onChange={e => setRejectMotivo(e.target.value)}
+                placeholder="Ex: Desculpe, não vou conseguir atender nesse horário :("
+                rows={3}
+                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-rose-300 resize-none"
+              />
+              <p className="text-[11px] text-text-muted">
+                Se preenchido, o motivo será incluído na mensagem enviada pelo WhatsApp.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                onClick={() => handleRejectConfirm(true)}
+                disabled={rejectSaving}
+                className="flex items-center justify-center gap-2 w-full py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+              >
+                <XCircle className="w-4 h-4" />
+                {rejectSaving ? 'Recusando...' : 'Recusar e notificar pelo WhatsApp'}
+              </button>
+              <button
+                onClick={() => handleRejectConfirm(false)}
+                disabled={rejectSaving}
+                className="flex items-center justify-center gap-2 w-full py-2.5 border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+              >
+                <XCircle className="w-4 h-4" />
+                {rejectSaving ? 'Recusando...' : 'Recusar sem notificar'}
+              </button>
+              <button
+                onClick={() => setRejectModalAppt(null)}
+                disabled={rejectSaving}
+                className="w-full py-2.5 border border-border hover:bg-bg text-text-secondary rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Voltar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
