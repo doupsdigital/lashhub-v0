@@ -181,13 +181,34 @@ Clique sobre o card de um agendamento no calendário para abrir os detalhes e al
 
 O Dashboard consolida a saúde financeira e operacional do seu negócio. Ele atualiza em tempo real sempre que você altera o status dos agendamentos.
 
-### O que cada indicador significa:
-1. **Faturamento Mensal (R$)**: A soma do valor de todos os agendamentos com o status **Concluído** dentro do mês atual. Te dá a visão real do seu ganho.
-2. **Agendamentos Realizados**: Quantidade total de atendimentos concluídos no mês.
-3. **Taxa de Ocupação da Agenda (%)**: Indica a porcentagem de horas em que você esteve trabalhando comparado com o total de horas que você configurou como disponíveis em "Meus Horários". Se a taxa estiver baixa (ex: 30%), significa que você tem muitos horários ociosos e precisa fazer ações de marketing.
-4. **Novas Clientes**: Número de novas clientes cadastradas (manualmente ou pelo portal) no mês corrente.
+### Filtro de Período
+No topo do dashboard há atalhos para filtrar os dados por período: **Hoje**, **Ontem**, **Últimos 7 dias**, **Este mês**, **Mês passado**, **Este ano** e **Personalizado** (onde você define um intervalo de datas livremente). Todos os cards e gráficos respondem ao período selecionado.
 
-Abaixo dos cards, você conta com um gráfico com a evolução do seu faturamento e uma lista rápida com os **Agendamentos de Hoje**, para você saber quem vai atender a seguir sem precisar entrar na aba da agenda.
+### Cards de Indicadores Rápidos
+1. **Valor Total Ganho (R$)**: A soma do valor de todos os agendamentos com status **Concluído** no período selecionado. É o seu faturamento real do período.
+2. **Total de Agendamentos**: Quantidade total de agendamentos criados no período, independente do status.
+3. **Aguardando Confirmação**: Quantidade de agendamentos feitos pelas clientes pelo portal que ainda não foram aprovados. Clique no card para ir direto ao painel de pendentes.
+4. **Novos Clientes**: Número de clientes cadastradas no período (manualmente pela profissional ou via portal).
+
+### Próximos Atendimentos de Hoje
+Lista todos os agendamentos do dia atual ainda não concluídos, exibindo o horário, nome da cliente, serviço e status de cada um. Útil para ter uma visão rápida do que vem a seguir sem precisar abrir a agenda.
+
+### Gráficos e Análises
+
+**Receita ao longo do tempo**
+Gráfico de linha mostrando a evolução do faturamento (soma dos agendamentos concluídos) ao longo do período selecionado. Ideal para identificar tendências de crescimento ou quedas em determinadas semanas/meses.
+
+**Agendamentos por dia da semana**
+Gráfico de barras que mostra em quais dias da semana você tem mais agendamentos. Ajuda a entender quais dias são mais movimentados e planejar melhor sua agenda.
+
+**Clientes novas vs recorrentes**
+Gráfico de barras empilhadas comparando, ao longo do tempo, quantas clientes atendidas eram novas (primeiro atendimento) e quantas eram recorrentes (já atendidas anteriormente). Indica o quanto o seu negócio retém clientes.
+
+**Serviços mais realizados**
+Gráfico de barras horizontais mostrando os procedimentos com maior número de execuções no período. Ajuda a identificar quais serviços são carro-chefe do seu estúdio.
+
+**Receita por categoria de serviço**
+Gráfico de pizza com a distribuição percentual do faturamento por tipo de serviço. Mostra quais categorias geram mais receita para o negócio.
 
 ---
 

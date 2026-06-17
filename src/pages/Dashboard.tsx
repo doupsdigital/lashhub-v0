@@ -561,15 +561,17 @@ export default function Dashboard() {
           {/* KPI CARDS GRID */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
-            {/* KPI 1: Clientes */}
+            {/* KPI 1: Valor Total Ganho */}
             <div className="bg-white border border-border rounded-[14px] p-5 flex items-center justify-between shadow-sm">
               <div className="space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Novos Clientes</span>
-                <p className="text-3xl font-title font-semibold text-text-primary">{totalClients}</p>
-                <p className="text-[10px] text-text-muted">Cadastrados no período</p>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Valor Total Ganho</span>
+                <p className="text-3xl font-title font-semibold text-rose-800">
+                  R$ {totalEarned.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[10px] text-text-muted">Atendimentos finalizados</p>
               </div>
               <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
-                <Users className="w-5 h-5" />
+                <Coins className="w-5 h-5" />
               </div>
             </div>
 
@@ -585,21 +587,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* KPI 3: Valor Total Ganho */}
-            <div className="bg-white border border-border rounded-[14px] p-5 flex items-center justify-between shadow-sm">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Valor Total Ganho</span>
-                <p className="text-3xl font-title font-semibold text-rose-800">
-                  R$ {totalEarned.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-[10px] text-text-muted">Atendimentos finalizados</p>
-              </div>
-              <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
-                <Coins className="w-5 h-5" />
-              </div>
-            </div>
-
-            {/* KPI 4: Agendamentos Pendentes */}
+            {/* KPI 3: Agendamentos Pendentes */}
             <div
               onClick={() => pendingAppointments > 0 && navigate('/agendamentos', { state: { openPending: true } })}
               className={`bg-white border border-amber-200 rounded-[14px] p-5 flex items-center justify-between shadow-sm transition-colors ${pendingAppointments > 0 ? 'cursor-pointer hover:bg-amber-50/60' : ''}`}
@@ -611,6 +599,18 @@ export default function Dashboard() {
               </div>
               <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
                 <Briefcase className="w-5 h-5" />
+              </div>
+            </div>
+
+            {/* KPI 4: Clientes */}
+            <div className="bg-white border border-border rounded-[14px] p-5 flex items-center justify-between shadow-sm">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Novos Clientes</span>
+                <p className="text-3xl font-title font-semibold text-text-primary">{totalClients}</p>
+                <p className="text-[10px] text-text-muted">Cadastrados no período</p>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                <Users className="w-5 h-5" />
               </div>
             </div>
 
