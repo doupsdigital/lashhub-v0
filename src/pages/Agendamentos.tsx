@@ -16,7 +16,8 @@ import {
   Edit2,
   Trash2,
   CheckCircle,
-  XCircle
+  XCircle,
+  UserX
 } from 'lucide-react';
 import type {
   Agendamento,
@@ -873,6 +874,43 @@ export default function Agendamentos() {
     });
   };
 
+  const handleMarkNoShow = (appt: AgendamentoWithRelations) => {
+    const clientName = appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome}` : 'Cliente';
+    openConfirmModal({
+      title: 'Registrar Falta?',
+      description: `Confirma que "${clientName}" não compareceu ao agendamento sem aviso prévio?`,
+      warningText: 'Esta falta será registrada no histórico da cliente.',
+      confirmText: 'Registrar Falta',
+      cancelText: 'Voltar',
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('agendamentos')
+            .update({ status: 'falta' })
+            .eq('id', appt.id);
+          if (error) throw error;
+          await registrarLog('editou', 'agendamento', appt.id, `Registrou falta de "${clientName}" no agendamento`);
+          setIsDetailOpen(false);
+          const dateObj = new Date(appt.data_hora);
+          setSuccessModal({
+            isOpen: true,
+            title: 'Falta Registrada',
+            clientName: appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome || ''}`.trim() : 'Cliente',
+            services: appt.agendamento_servicos?.map(s => s.servico?.nome).join(', ') || '—',
+            dateStr: dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }),
+            timeStr: dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            whatsappLink: undefined,
+          });
+          fetchAppointments();
+        } catch (err) {
+          console.error(err);
+          showTemporaryError('Falha ao registrar falta.');
+        }
+      }
+    });
+  };
+
   // Visual status mapper for calendar blocks
   const getStatusColorStyles = (status: string = 'confirmado') => {
     switch (status) {
@@ -882,6 +920,8 @@ export default function Agendamentos() {
         return { border: 'border-emerald-300', bg: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800', badge: 'bg-emerald-200 text-emerald-950', text: 'text-emerald-900' };
       case 'pendente':
         return { border: 'border-amber-300', bg: 'bg-amber-50 hover:bg-amber-100 text-amber-800', badge: 'bg-amber-200 text-amber-900', text: 'text-amber-900' };
+      case 'falta':
+        return { border: 'border-red-400', bg: 'bg-red-50 hover:bg-red-100 text-red-800 opacity-70', badge: 'bg-red-200 text-red-900', text: 'text-red-900' };
       default: // confirmado
         return { border: 'border-rose-300', bg: 'bg-rose-50 hover:bg-rose-100 text-rose-800', badge: 'bg-rose-200 text-rose-900', text: 'text-rose-900' };
     }
@@ -1385,8 +1425,9 @@ export default function Agendamentos() {
                   ${selectedAppt.status === 'pendente' ? 'bg-amber-100 text-amber-700 border border-amber-200' : ''}
                   ${selectedAppt.status === 'concluido' ? 'bg-green-100 text-green-800 border border-green-200' : ''}
                   ${selectedAppt.status === 'cancelado' ? 'bg-gray-100 text-gray-500 border border-gray-200' : ''}
+                  ${selectedAppt.status === 'falta' ? 'bg-red-100 text-red-800 border border-red-200' : ''}
                 `}>
-                  {selectedAppt.status}
+                  {selectedAppt.status === 'falta' ? 'Falta' : selectedAppt.status}
                 </span>
               </div>
 
@@ -1493,6 +1534,15 @@ export default function Agendamentos() {
                         Cancelar
                       </button>
                     </div>
+                    {new Date(selectedAppt.data_hora) < new Date() && (
+                      <button
+                        onClick={() => handleMarkNoShow(selectedAppt)}
+                        className="flex items-center justify-center gap-1.5 py-2 w-full border border-red-300 hover:bg-red-50 text-red-700 rounded-lg text-xs font-semibold cursor-pointer"
+                      >
+                        <UserX className="w-4 h-4" />
+                        Marcar Falta (No-show)
+                      </button>
+                    )}
                     <button
                       onClick={() => handleOpenEditForm(selectedAppt)}
                       className="flex items-center justify-center gap-1.5 py-2 w-full bg-rose-600 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
@@ -1503,9 +1553,9 @@ export default function Agendamentos() {
                   </>
                 )}
 
-                {(selectedAppt.status === 'concluido' || selectedAppt.status === 'cancelado') && (
+                {(selectedAppt.status === 'concluido' || selectedAppt.status === 'cancelado' || selectedAppt.status === 'falta') && (
                   <p className="text-[11px] text-text-secondary italic text-center py-1 bg-bg rounded">
-                    Agendamentos concluídos ou cancelados não podem ser editados.
+                    Agendamentos concluídos, cancelados ou com falta não podem ser editados.
                   </p>
                 )}
 

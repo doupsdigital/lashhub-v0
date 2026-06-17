@@ -124,15 +124,15 @@ Clique sobre o nome de qualquer cliente na tabela para abrir o perfil avançado 
 *Rota: `/meus-horarios` (Menu Lateral -> Meus Horários)*
 
 > [!IMPORTANT]
-> Esta funcionalidade está disponível a partir do **Plano Profissional/Premium**.
+> Esta funcionalidade está disponível apenas no **Plano Premium**.
 
 Para que suas clientes agendem online de forma correta, você precisa definir os dias e horários em que trabalha.
 
 ### Configurando o Turno Semanal:
 Para cada dia da semana (Segunda a Domingo), você pode:
-1. **Ativar/Desativar o Dia**: Marque ou desmarque a chave ao lado do dia. Dias desativados não estarão disponíveis para agendamento.
+1. **Ativar/Desativar o Dia**: Marque ou desmarque a chave(quadrado) ao lado do dia. Dias desativados não estarão disponíveis para agendamento.
 2. **Definir Horário de Início e Término**: Horário que você abre o estúdio e horário que encerra as atividades.
-3. **Definir Intervalo (Almoço)**: Preencha o horário de saída para o almoço e retorno (ex: Saída 12:00, Retorno 13:00). O sistema removerá essa faixa de horários livres no portal do cliente para você poder almoçar com calma.
+
 
 ### Bloqueios de Agenda (Férias, Feriados ou Imprevistos):
 Precisa ir ao médico na próxima terça à tarde ou vai tirar férias de uma semana? 
@@ -151,13 +151,13 @@ Precisa ir ao médico na próxima terça à tarde ou vai tirar férias de uma se
 *Rota: `/agendamentos` (Menu Lateral -> Agendamentos)*
 
 > [!IMPORTANT]
-> Esta funcionalidade está disponível a partir do **Plano Profissional/Premium**.
+> Esta funcionalidade está disponível apenas no **Plano Premium**.
 
 Esta é a tela principal de operação do dia a dia do estúdio.
 
 ### Visualizações Disponíveis:
 * **Calendário**: Visão gráfica clássica. Você pode alternar os botões no topo para ver o **Mês**, a **Semana** ou apenas o **Dia** atual.
-* **Lista de Solicitações**: Caso você tenha desativado a *Aprovação Automática*, todos os agendamentos feitos por clientes pelo portal aparecerão aqui aguardando seu clique em "Aprovar" ou "Recusar".
+* **Aguardando Confirmação**: Caso você tenha desativado a *Aprovação Automática*, todos os agendamentos feitos por clientes pelo portal aparecerão aqui aguardando seu clique em "Aprovar" ou "Recusar".
 
 ### Como Criar um Agendamento Manual:
 Se uma cliente ligar ou mandar mensagem direta no WhatsApp e você quiser reservar o horário dela:
@@ -165,7 +165,7 @@ Se uma cliente ligar ou mandar mensagem direta no WhatsApp e você quiser reserv
 2. Selecione a **Cliente** (pesquise digitando o nome).
 3. Escolha o **Serviço**.
 4. Defina a **Data** e o **Horário**.
-5. Clique em **Confirmar**. O sistema calculará o término com base na duração do serviço escolhido e marcará o bloco de tempo na agenda.
+5. Clique em **Criar Agendamento**. O sistema calculará o término com base na duração do serviço escolhido e marcará o bloco de tempo na agenda.
 
 ### Alterando o Status de um Agendamento:
 Clique sobre o card de um agendamento no calendário para abrir os detalhes e alterar seu status:

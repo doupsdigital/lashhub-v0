@@ -101,7 +101,7 @@ export interface Agendamento {
   cliente_id: string;
   data_hora: string;
   duracao_minutos: number;
-  status: 'pendente' | 'confirmado' | 'cancelado' | 'concluido';
+  status: 'pendente' | 'confirmado' | 'cancelado' | 'concluido' | 'falta';
   origem: 'admin' | 'portal';
   observacoes?: string | null;
   created_at?: string;

@@ -17,7 +17,8 @@ import {
   Moon,
   HeartPulse,
   ShieldAlert,
-  CheckCircle
+  CheckCircle,
+  UserX
 } from 'lucide-react';
 import type { Cliente, Servico, VariacaoServico } from '../types';
 import { registrarLog } from '../utils/log';
@@ -29,7 +30,7 @@ interface AtendimentoWithRelations {
   observacoes: string | null;
   servico_name: string;
   variacao_name?: string | null;
-  tipo: 'manual' | 'agendamento';
+  tipo: 'manual' | 'agendamento' | 'falta';
 }
 
 interface ServicoWithVariations extends Servico {
@@ -62,6 +63,7 @@ export default function PerfilCliente() {
   // Data States
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [atendimentos, setAtendimentos] = useState<AtendimentoWithRelations[]>([]);
+  const [totalFaltas, setTotalFaltas] = useState(0);
   const [servicos, setServicos] = useState<ServicoWithVariations[]>([]);
   
   const [loading, setLoading] = useState(true);
@@ -171,7 +173,7 @@ export default function PerfilCliente() {
       setAlergiaProdutos(!!lashData.alergia_produtos);
 
       // 2. Fetch history (combine manual records and concluded appointments)
-      const [histRes, concludedRes] = await Promise.all([
+      const [histRes, concludedRes, faltasRes] = await Promise.all([
         supabase
           .from('atendimentos')
           .select('*, servicos(nome), variacoes_servico(nome)')
@@ -186,11 +188,25 @@ export default function PerfilCliente() {
             )
           `)
           .eq('cliente_id', id)
-          .eq('status', 'concluido')
+          .eq('status', 'concluido'),
+        supabase
+          .from('agendamentos')
+          .select(`
+            id, data_hora, status, observacoes,
+            agendamento_servicos (
+              servico:servicos(nome),
+              variacao:variacoes_servico(nome)
+            )
+          `)
+          .eq('cliente_id', id)
+          .eq('status', 'falta')
+          .order('data_hora', { ascending: false })
       ]);
 
       if (histRes.error) throw histRes.error;
       if (concludedRes.error) throw concludedRes.error;
+      if (faltasRes.error) throw faltasRes.error;
+      setTotalFaltas(faltasRes.data?.length ?? 0);
 
       const manualItems = (histRes.data || []).map((a: any) => ({
         id: a.id,
@@ -220,8 +236,25 @@ export default function PerfilCliente() {
         };
       });
 
-      const combined = [...manualItems, ...apptItems].sort((a, b) => {
-        return b.data.localeCompare(a.data);
+      const faltaItems = (faltasRes.data || []).map((a: any) => {
+        const servicesList = (a.agendamento_servicos || []).map((as: any) => {
+          const sName = as.servico?.nome || 'Serviço';
+          const vName = as.variacao?.nome;
+          return vName ? `${sName} (${vName})` : sName;
+        });
+        return {
+          id: a.id,
+          data: a.data_hora.split('T')[0],
+          valor_cobrado: 0,
+          observacoes: a.observacoes,
+          servico_name: servicesList.join(', ') || 'Serviço não especificado',
+          variacao_name: null,
+          tipo: 'falta' as const
+        };
+      });
+
+      const combined = [...manualItems, ...apptItems, ...faltaItems].sort((a, b) => {
+        return new Date(a.data).getTime() - new Date(b.data).getTime();
       });
 
       setAtendimentos(combined);
@@ -597,6 +630,16 @@ export default function PerfilCliente() {
                   : <span className="text-text-muted italic">Não informado</span>}
               </p>
             </div>
+
+            {totalFaltas > 0 && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <UserX className="w-4 h-4 text-red-600 flex-shrink-0" />
+                <div>
+                  <p className="text-[10px] text-red-700 uppercase font-bold">Faltas registradas</p>
+                  <p className="text-sm font-bold text-red-800">{totalFaltas} {totalFaltas === 1 ? 'falta' : 'faltas'}</p>
+                </div>
+              </div>
+            )}
 
             <div className="pt-2 border-t border-border/60">
               <p className="text-[10px] text-text-secondary uppercase font-semibold">Cadastro</p>
@@ -1034,29 +1077,43 @@ export default function PerfilCliente() {
                     {atendimentos.map(atend => {
                       const dateObj = new Date(atend.data + 'T12:00:00'); // Prevent timezone offset
                       const formattedDate = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-                      
+                      const isFalta = atend.tipo === 'falta';
+
                       return (
                         <div key={atend.id} className="relative group">
                           {/* Dot indicator */}
-                          <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 border-rose-400 bg-white group-hover:bg-rose-600 transition-colors" />
+                          <div className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 bg-white transition-colors
+                            ${isFalta ? 'border-red-400 group-hover:bg-red-500' : 'border-rose-400 group-hover:bg-rose-600'}`}
+                          />
 
-                          <div className="bg-bg/15 hover:bg-bg/40 border border-border p-4 rounded-xl transition-all max-w-2xl">
+                          <div className={`border p-4 rounded-xl transition-all max-w-2xl
+                            ${isFalta
+                              ? 'bg-red-50/30 hover:bg-red-50/60 border-red-200'
+                              : 'bg-bg/15 hover:bg-bg/40 border-border'}`}
+                          >
                             <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                               <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-rose-400" />
+                                <Clock className={`w-3 h-3 ${isFalta ? 'text-red-400' : 'text-rose-400'}`} />
                                 {formattedDate}
-                                {atend.tipo === 'agendamento' ? (
+                                {isFalta ? (
+                                  <span className="ml-2 bg-red-100 border border-red-200 text-red-700 text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase flex items-center gap-0.5">
+                                    <UserX className="w-2.5 h-2.5" />
+                                    Falta
+                                  </span>
+                                ) : atend.tipo === 'agendamento' ? (
                                   <span className="ml-2 bg-rose-50 border border-rose-100 text-rose-700 text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase">Agendado</span>
                                 ) : (
                                   <span className="ml-2 bg-gray-50 border border-gray-150 text-gray-500 text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase">Manual</span>
                                 )}
                               </span>
-                              <span className="text-sm font-bold text-rose-800 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
-                                R$ {Number(atend.valor_cobrado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </span>
+                              {!isFalta && (
+                                <span className="text-sm font-bold text-rose-800 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+                                  R$ {Number(atend.valor_cobrado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
                             </div>
 
-                            <h4 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+                            <h4 className={`text-sm font-bold flex items-center gap-1.5 ${isFalta ? 'text-red-800 line-through opacity-70' : 'text-text-primary'}`}>
                               {atend.servico_name}
                               {atend.variacao_name && (
                                 <span className="text-[10px] bg-gold-light/40 text-gold border border-gold-light/60 px-1.5 py-0.5 rounded font-normal font-sans">
@@ -1064,6 +1121,10 @@ export default function PerfilCliente() {
                                 </span>
                               )}
                             </h4>
+
+                            {isFalta && (
+                              <p className="text-[11px] text-red-600 mt-1">Cliente não compareceu ao agendamento.</p>
+                            )}
 
                             {atend.observacoes && (
                               <div className="mt-3 text-xs text-text-secondary bg-white border border-border/40 p-2.5 rounded-lg leading-relaxed italic">
