@@ -170,17 +170,17 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobile
       )}
 
       {/* Sidebar Container */}
-      <aside 
+      <aside
         className={`
-          fixed top-0 bottom-0 left-0 bg-white border-r border-border z-50 flex flex-col justify-between
+          fixed top-0 bottom-0 left-0 bg-white border-r border-border z-50 flex flex-col overflow-hidden
           transition-all duration-300 ease-in-out
           ${collapsed ? 'w-[64px]' : 'w-[220px]'}
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
         {/* Top Header / Logo */}
-        <div>
-          <div className={`h-[60px] border-b border-border flex items-center px-4 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className={`h-[60px] border-b border-border flex items-center px-4 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-2">
               {logoUrl ? (
                 <img
@@ -210,7 +210,7 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobile
           </div>
 
           {/* Navigation Items */}
-          <nav className="p-3 space-y-6">
+          <nav className="flex-1 overflow-y-auto p-3 space-y-6">
             {/* MENU SECTION */}
             <div className="space-y-1.5">
               {!collapsed && (
