@@ -738,23 +738,6 @@ export default function Agendamentos() {
     }
   };
 
-  const handleConfirmAppointment = async (appt: AgendamentoWithRelations) => {
-    try {
-      const { error } = await supabase
-        .from('agendamentos')
-        .update({ status: 'confirmado' })
-        .eq('id', appt.id);
-      if (error) throw error;
-      const clientName = appt.cliente ? `${appt.cliente.nome} ${appt.cliente.sobrenome}` : 'Cliente';
-      await registrarLog('editou', 'agendamento', appt.id, `Confirmou agendamento de "${clientName}"`);
-      showSuccessFeedback(appt, false);
-      fetchAppointments();
-    } catch (err) {
-      console.error(err);
-      showTemporaryError('Falha ao confirmar agendamento.');
-    }
-  };
-
   // Open the conclude modal (instead of the generic confirm)
   const handleOpenConcludeModal = (appt: AgendamentoWithRelations) => {
     const total = appt.agendamento_servicos?.reduce((sum, s) => sum + Number(s.valor_cobrado || 0), 0) || 0;
@@ -930,7 +913,6 @@ export default function Agendamentos() {
   // Calendar parameters
   const startHour = 8;
   const endHour = 20;
-  const hourSlots = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
   const halfHourSlots = Array.from({ length: (endHour - startHour) * 2 }, (_, i) => ({
     hour: startHour + Math.floor(i / 2),
     minute: (i % 2) * 30,
