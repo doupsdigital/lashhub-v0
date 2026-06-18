@@ -236,7 +236,7 @@ export default function PortalAgendar() {
     (async () => {
       setLoadingServicos(true);
       try {
-        const [catRes, servRes, varRes] = await Promise.all([
+        const [catRes, servRes] = await Promise.all([
           supabase
             .from('categorias_servico')
             .select('*')
@@ -244,26 +244,23 @@ export default function PortalAgendar() {
             .order('ordem', { ascending: true }),
           supabase
             .from('servicos')
-            .select('*')
+            .select('*, variacoes_servico(*)')
             .eq('estabelecimento_id', establishmentId)
             .eq('ativo', true)
             .order('nome', { ascending: true }),
-          supabase.from('variacoes_servico').select('*'),
         ]);
 
         if (catRes.error) throw catRes.error;
         if (servRes.error) throw servRes.error;
-        if (varRes.error) throw varRes.error;
 
         const servicos = servRes.data || [];
-        const variacoes = varRes.data || [];
 
         const mapped: CategoriaComServicos[] = (catRes.data || [])
           .map(cat => ({
             ...cat,
             servicos: servicos
               .filter(s => s.categoria_id === cat.id)
-              .map(s => ({ ...s, variacoes: variacoes.filter(v => v.servico_id === s.id) })),
+              .map(s => ({ ...s, variacoes: (s as any).variacoes_servico || [] })),
           }))
           .filter(cat => cat.servicos.length > 0)
           .sort((a, b) => {
