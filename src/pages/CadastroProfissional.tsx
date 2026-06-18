@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Mail, Lock, User, Briefcase } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Mail, Lock, User, Briefcase, Sparkles, Calendar, Link2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function CadastroProfissional() {
@@ -88,7 +88,6 @@ export default function CadastroProfissional() {
       });
 
       setSuccess(true);
-      setTimeout(() => navigate('/configuracoes', { replace: true }), 1500);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Ocorreu um erro ao criar seu cadastro. Tente novamente.');
       setSubmitting(false);
@@ -127,12 +126,7 @@ export default function CadastroProfissional() {
           </div>
         )}
 
-        {success && (
-          <div className="mb-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl flex items-start gap-2.5">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-600 mt-0.5" />
-            <p className="text-xs font-medium leading-relaxed">Conta criada com sucesso! Redirecionando... 🎉</p>
-          </div>
-        )}
+        {/* O modal de boas-vindas é renderizado fora do card abaixo */}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nome */}
@@ -276,6 +270,66 @@ export default function CadastroProfissional() {
           </Link>
         </p>
       </div>
+
+      {/* Modal de Boas-Vindas */}
+      {success && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-md p-8 flex flex-col items-center text-center animate-slide-up">
+
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-rose-600 to-rose-400 flex items-center justify-center shadow-lg mb-5 overflow-hidden">
+              <img
+                src="/logo-login.png"
+                alt="Lash Hub"
+                className="w-[110%] h-[110%] object-contain invert mix-blend-screen scale-130"
+              />
+            </div>
+
+            <h2 className="font-title font-bold text-2xl text-text-primary mb-1">
+              Bem-vinda ao Lash Hub!
+            </h2>
+            <p className="text-sm text-text-secondary mb-6 leading-relaxed">
+              Seu espaço <span className="font-semibold text-rose-600">{form.nomeNegocio}</span> foi criado com sucesso. Agora é só configurar e começar a receber agendamentos.
+            </p>
+
+            <div className="w-full space-y-3 mb-7 text-left">
+              <div className="flex items-start gap-3 bg-rose-50/50 border border-rose-100 rounded-xl p-3.5">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-rose-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-text-primary">Cadastre seus serviços</p>
+                  <p className="text-[11px] text-text-secondary mt-0.5">Adicione os procedimentos, preços e durações que você oferece.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 bg-rose-50/50 border border-rose-100 rounded-xl p-3.5">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="w-4 h-4 text-rose-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-text-primary">Configure seus horários</p>
+                  <p className="text-[11px] text-text-secondary mt-0.5">Defina os dias e horários em que você atende.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 bg-rose-50/50 border border-rose-100 rounded-xl p-3.5">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+                  <Link2 className="w-4 h-4 text-rose-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-text-primary">Compartilhe seu link</p>
+                  <p className="text-[11px] text-text-secondary mt-0.5">Envie o link do portal para suas clientes agendarem online.</p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => navigate('/configuracoes', { replace: true })}
+              className="w-full py-3.5 bg-rose-600 hover:bg-rose-800 text-white rounded-xl text-sm font-semibold transition-all shadow-md cursor-pointer"
+            >
+              Começar a configurar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
