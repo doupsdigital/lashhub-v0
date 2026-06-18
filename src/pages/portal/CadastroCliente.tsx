@@ -67,26 +67,10 @@ export default function CadastroCliente() {
         throw new Error('Estabelecimento não carregado.');
       }
 
-      // Passo 1 — Gerar o ID do cliente no frontend para evitar a necessidade de SELECT (restrição RLS)
+      // Passo 1 — Criar usuário no Auth PRIMEIRO para evitar registro órfão em clientes
+      // se o e-mail já estiver cadastrado ou outro erro de auth ocorrer.
       const clientId = crypto.randomUUID();
 
-      const { error: clientError } = await supabase
-        .from('clientes')
-        .insert({
-          id: clientId,
-          nome: form.nome.trim(),
-          sobrenome: form.sobrenome.trim(),
-          email: form.email.trim().toLowerCase(),
-          whatsapp: form.whatsapp,
-          estabelecimento_id: establishmentId
-        });
-
-      if (clientError) {
-        console.error('[cadastro] client insert error:', clientError);
-        throw new Error(`Erro ao registrar dados do cliente: ${clientError.message}`);
-      }
-
-      // Passo 2 — Criar usuário no Supabase Auth com metadados para a trigger
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email.trim().toLowerCase(),
         password: form.senha,
@@ -108,13 +92,28 @@ export default function CadastroCliente() {
         if (msg.includes('rate limit') || authError.status === 429) {
           throw new Error('Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.');
         }
-        console.error('[cadastro] auth error:', authError.message);
         throw new Error('Ocorreu um erro ao criar sua conta. Tente novamente.');
       }
 
       if (!authData.user) throw new Error('Ocorreu um erro ao criar sua conta. Tente novamente.');
 
-      // Faz login automático
+      // Passo 2 — Auth criado com sucesso: inserir registro em clientes
+      const { error: clientError } = await supabase
+        .from('clientes')
+        .insert({
+          id: clientId,
+          nome: form.nome.trim(),
+          sobrenome: form.sobrenome.trim(),
+          email: form.email.trim().toLowerCase(),
+          whatsapp: form.whatsapp,
+          estabelecimento_id: establishmentId
+        });
+
+      if (clientError) {
+        throw new Error(`Erro ao registrar dados do cliente: ${clientError.message}`);
+      }
+
+      // Passo 3 — Login automático
       await supabase.auth.signInWithPassword({
         email: form.email.trim().toLowerCase(),
         password: form.senha,
