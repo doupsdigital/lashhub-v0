@@ -4,7 +4,7 @@
   "description": "Sistema de agendamentos para profissionais de cílios e estética",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#F7F3EE",
   "theme_color": "#A85560",
   "icons": [
