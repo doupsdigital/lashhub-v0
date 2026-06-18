@@ -548,13 +548,20 @@ export default function Agendamentos() {
       }
 
       // 3. Overlap check against global agenda (excluding itself if editing)
+      // Usa boundaries derivadas do horário local para evitar desalinhamento de fuso
+      const dayStart = new Date(startDateTime);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(startDateTime);
+      dayEnd.setHours(23, 59, 59, 999);
+
       let agendaQuery = supabase
         .from('agendamentos')
         .select('*')
         .eq('estabelecimento_id', estabelecimentoId)
         .neq('status', 'cancelado')
-        .gte('data_hora', `${formData}T00:00:00Z`)
-        .lte('data_hora', `${formData}T23:59:59Z`);
+        .neq('status', 'falta')
+        .gte('data_hora', dayStart.toISOString())
+        .lte('data_hora', dayEnd.toISOString());
 
       if (editingAppt) {
         agendaQuery = agendaQuery.neq('id', editingAppt.id);
