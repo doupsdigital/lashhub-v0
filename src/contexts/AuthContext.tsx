@@ -44,7 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('[AuthContext] onAuthStateChange event:', _event, 'session user:', session?.user?.email);
       if (!session?.user) {
         setUser(null);
         setProfile(null);
@@ -85,7 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const profileData = data as any;
-      console.log('[AuthContext] Profile query result for', session.user.email, ':', profileData);
       if (!profileData) {
         console.warn('[AuthContext] No profile found for', session.user.email, 'signing out. Error:', error);
         // Usuário autenticado mas sem registro em usuarios → logout automático
